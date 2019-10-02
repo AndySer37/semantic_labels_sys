@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="serial_no_camera1" default="740112071210" doc="sr300 mounted left side"/>
+    <arg name="serial_no_camera2" default="839112061639" doc="sr300 mounted middle"/>
+    <arg name="serial_no_camera3" default="727212070349" doc="sr300 mounted middle"/>
+    
+    <include file="$(find realsense2_camera)/launch/rs_multiple_devices.launch">
+        <arg name="serial_no_camera1" value="$(arg serial_no_camera1)"/>
+        <arg name="serial_no_camera2" value="$(arg serial_no_camera2)"/>
+        <arg name="serial_no_camera3" value="$(arg serial_no_camera3)"/>
+    </include>
+</launch>
