@@ -1,0 +1,5 @@
+#Request data
+bool data # for switch status
+---
+#Response data
+string result # for mission result

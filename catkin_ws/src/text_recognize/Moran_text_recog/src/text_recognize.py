@@ -21,7 +21,7 @@ from torch.autograd import Variable
 import os 
 import message_filters
 from text_msgs.msg import text_detection_msg, text_detection_array, int_arr
-from text_msgs.srv import text_recognize_srv
+from text_msgs.srv import *
 
 from PIL import Image as Im
 import tools.utils as utils
@@ -35,7 +35,7 @@ class text_recognize(object):
 		self.prob_threshold = 0.90
 		self.cv_bridge = CvBridge()
 		self.commodity_list = []
-		self.read_commodity(self.path + "/config/commodity_list.txt")
+		self.read_commodity(r.get_path('text_msgs') + "/config/commodity_list.txt")
 		self.alphabet = '0:1:2:3:4:5:6:7:8:9:a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:u:v:w:x:y:z:$' 
 
 		self.means = (0.485, 0.456, 0.406)
@@ -74,9 +74,10 @@ class text_recognize(object):
 
 		#### Publisher
 		self.image_pub = rospy.Publisher("~predict_img", Image, queue_size = 1)
+		self.mask = rospy.Publisher("~mask", Image, queue_size = 1)
 		self.img_bbox_pub = rospy.Publisher("~predict_bbox", Image, queue_size = 1)
 		#### Service
-		self.predict_ser = rospy.Service("text_recognize_server", text_recognize_srv, self.srv_callback)
+		self.predict_ser = rospy.Service("~text_recognize_server", text_recognize_srv, self.srv_callback)
 
 		image_sub1 = rospy.Subscriber('/text_detection_array', text_detection_array, self.callback, queue_size = 1)
 		### msg filter 
@@ -103,37 +104,47 @@ class text_recognize(object):
 		except CvBridgeError as e:
 			print(e)
 		
-		predict_img = self.predict(msg, cv_image)
+		predict_img, mask = self.predict(msg, cv_image)
 		img_bbox = cv_image.copy()
 
 		try:
 			self.image_pub.publish(self.cv_bridge.cv2_to_imgmsg(predict_img, "bgr8"))
 			self.img_bbox_pub.publish(self.cv_bridge.cv2_to_imgmsg(img_bbox, "bgr8"))
+			self.mask.publish(self.cv_bridge.cv2_to_imgmsg(mask, "8UC1"))
 		except CvBridgeError as e:
 			print(e)
 
-	def srv_callback(self, msg):
+	def srv_callback(self, req):
+		resp = text_recognize_srvResponse()
 		try:
 			if self.is_compressed:
-				np_arr = np.fromstring(msg.image, np.uint8)
+				np_arr = np.fromstring(req.data.image, np.uint8)
 				cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 			else:
-				cv_image = self.cv_bridge.imgmsg_to_cv2(msg.image, "bgr8")
+				cv_image = self.cv_bridge.imgmsg_to_cv2(req.data.image, "bgr8")
 		except CvBridgeError as e:
+			resp.state = e
 			print(e)
 		
-		predict_img = self.predict(msg, cv_image)
+		predict_img, mask = self.predict(req.data, cv_image)
 		img_bbox = cv_image.copy()
 
 		try:
 			self.image_pub.publish(self.cv_bridge.cv2_to_imgmsg(predict_img, "bgr8"))
 			self.img_bbox_pub.publish(self.cv_bridge.cv2_to_imgmsg(img_bbox, "bgr8"))
+			resp.mask = self.cv_bridge.cv2_to_imgmsg(mask, "8UC1")
+			self.mask.publish(self.cv_bridge.cv2_to_imgmsg(mask, "8UC1"))
 		except CvBridgeError as e:
+			resp.state = e
 			print(e)
+
+		return resp
 
 	def predict(self, msg, img):
 		# # Preprocessing
 		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+		mask = np.zeros([480, 640], dtype = np.uint8)
+
 		for text_bb in msg.text_array:
 			if (text_bb.box.ymax - text_bb.box.ymin) * (text_bb.box.xmax - text_bb.box.xmin) < self.bbox_thres:
 				continue
@@ -172,11 +183,22 @@ class text_recognize(object):
 			# print('\nResult:\n' + 'Left to Right: ' + sim_preds + '\nRight to Left: ' + sim_preds_reverse + '\n\n')
 			end = time.time()
 			print "Text Recognize Time : {}".format(end - start)
+			if sim_preds in self.commodity_list:
+				cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (255, 0, 0), 3)
+				cv2.putText(img, sim_preds, (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 0, 255),3)
+				_cont = []
+				for p in text_bb.contour:
+					point = []
+					point.append(p.point[0])
+					point.append(p.point[1])
+					_cont.append(point)
+				_cont = np.array(_cont, np.int32)
+				cv2.fillConvexPoly(mask, _cont, 255-self.commodity_list.index(sim_preds))
 
-			cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (255, 0, 0), 3)
-			cv2.putText(img, sim_preds, (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 0, 255),3)
+			else:
+				cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (0, 0, 0), 2)
 
-		return img
+		return img, mask
 
 
 	def onShutdown(self):

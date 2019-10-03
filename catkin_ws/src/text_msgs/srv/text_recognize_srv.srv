@@ -3,7 +3,4 @@ text_detection_array data
 ---
 #Response data
 string state
-int32 count
-sensor_msgs/Image image
-sensor_msgs/Image depth
-text_result result # for mission result
+sensor_msgs/Image mask # for mission result

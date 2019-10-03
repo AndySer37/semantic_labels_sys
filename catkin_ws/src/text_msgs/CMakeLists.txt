@@ -24,6 +24,8 @@ add_service_files(
   FILES
   int32.srv
   text_recognize_srv.srv
+  text_detection_srv.srv
+  predict_switch.srv
 )
 
 generate_messages(
