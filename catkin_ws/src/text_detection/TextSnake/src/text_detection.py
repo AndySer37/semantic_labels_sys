@@ -20,7 +20,7 @@ import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 import os 
 import message_filters
-from text_msgs.msg import text_detection_msg, text_detection_array
+from text_msgs.msg import text_detection_msg, text_detection_array, int_arr
 # from dataset.deploy import DeployDataset
 from network.textnet import TextNet
 from util.detection import TextDetector
@@ -88,6 +88,12 @@ class text_detection(object):
 		text_array.depth = depth
 		for _cont in contours:
 			text_bb = text_detection_msg()
+			for p in _cont:
+				int_array = int_arr()
+				int_array.point.append(p[0])
+				int_array.point.append(p[1])
+				text_bb.contour.append(int_array)
+			cv2.drawContours(cv_image, [_cont], -1, (0, 255, 0), 2)
 			text_bb.box.xmin = min(_cont[:,0])
 			text_bb.box.xmax = max(_cont[:,0])
 			text_bb.box.ymin = min(_cont[:,1])

@@ -17,11 +17,13 @@ add_message_files(
   text_detection_msg.msg
   text_detection_array.msg
   bb_box.msg
+  int_arr.msg
 )
 
 add_service_files(
   FILES
   int32.srv
+  text_recognize_srv.srv
 )
 
 generate_messages(

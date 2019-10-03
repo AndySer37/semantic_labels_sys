@@ -20,7 +20,8 @@ import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 import os 
 import message_filters
-from text_msgs.msg import text_detection_msg, text_detection_array
+from text_msgs.msg import text_detection_msg, text_detection_array, int_arr
+from text_msgs.srv import text_recognize_srv
 
 from PIL import Image as Im
 import tools.utils as utils
@@ -33,11 +34,13 @@ class text_recognize(object):
 		self.path = r.get_path('Moran_text_recog')
 		self.prob_threshold = 0.90
 		self.cv_bridge = CvBridge()
-
+		self.commodity_list = []
+		self.read_commodity(self.path + "/config/commodity_list.txt")
 		self.alphabet = '0:1:2:3:4:5:6:7:8:9:a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:u:v:w:x:y:z:$' 
 
 		self.means = (0.485, 0.456, 0.406)
 		self.stds = (0.229, 0.224, 0.225)
+		self.bbox_thres = 3000
 
 		self.objects = []
 		self.is_compressed = False
@@ -72,6 +75,8 @@ class text_recognize(object):
 		#### Publisher
 		self.image_pub = rospy.Publisher("~predict_img", Image, queue_size = 1)
 		self.img_bbox_pub = rospy.Publisher("~predict_bbox", Image, queue_size = 1)
+		#### Service
+		self.predict_ser = rospy.Service("text_recognize_server", text_recognize_srv, self.srv_callback)
 
 		image_sub1 = rospy.Subscriber('/text_detection_array', text_detection_array, self.callback, queue_size = 1)
 		### msg filter 
@@ -81,8 +86,33 @@ class text_recognize(object):
 		# ts.registerCallback(self.callback)
 		print "============ Ready ============"
 
+	def read_commodity(self, path):
+
+		for line in open(path, "r"):
+			line = line.rstrip('\n')
+			self.commodity_list.append(line)
+		print "Finish reading list"
 
 	def callback(self, msg):
+		try:
+			if self.is_compressed:
+				np_arr = np.fromstring(msg.image, np.uint8)
+				cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+			else:
+				cv_image = self.cv_bridge.imgmsg_to_cv2(msg.image, "bgr8")
+		except CvBridgeError as e:
+			print(e)
+		
+		predict_img = self.predict(msg, cv_image)
+		img_bbox = cv_image.copy()
+
+		try:
+			self.image_pub.publish(self.cv_bridge.cv2_to_imgmsg(predict_img, "bgr8"))
+			self.img_bbox_pub.publish(self.cv_bridge.cv2_to_imgmsg(img_bbox, "bgr8"))
+		except CvBridgeError as e:
+			print(e)
+
+	def srv_callback(self, msg):
 		try:
 			if self.is_compressed:
 				np_arr = np.fromstring(msg.image, np.uint8)
@@ -105,7 +135,7 @@ class text_recognize(object):
 		# # Preprocessing
 		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 		for text_bb in msg.text_array:
-			if (text_bb.box.ymax - text_bb.box.ymin) * (text_bb.box.xmax - text_bb.box.xmin) < 5000:
+			if (text_bb.box.ymax - text_bb.box.ymin) * (text_bb.box.xmax - text_bb.box.xmin) < self.bbox_thres:
 				continue
 			start = time.time()
 			image = gray[text_bb.box.ymin:text_bb.box.ymax, text_bb.box.xmin:text_bb.box.xmax]
