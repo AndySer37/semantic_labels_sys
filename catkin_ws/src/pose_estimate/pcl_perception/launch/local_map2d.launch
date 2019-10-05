@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+
+<launch>
+
+    <arg name="cell_size" default="0.5"/>
+    <arg name="map_length" default="35"/>
+    <arg name="sync_time" default="0.5"/>
+    <arg name="vehicle_size" default="0.5"/>
+    <arg name="drift_x" default="0.1"/>
+    <arg name="drift_y" default="0.1"/>
+    <arg name="frame_period" default="0.2"/>
+    
+    <node pkg="pcl_perception" type="scan_to_localmap" name="scan_to_localmap"  output="screen" clear_params="true" required="true">
+        <param name="cell_size"     type="double"    value="$(arg cell_size)" />
+        <param name="map_length"    type="int"      value="$(arg map_length)" />
+        <param name="sync_time"     type="double"    value="$(arg sync_time)" />
+        <param name="vehicle_size"  type="double"   value="$(arg vehicle_size)" />
+        <param name="drift_x"       type="double"   value="$(arg drift_x)" />
+        <param name="drift_y"       type="double"   value="$(arg drift_y)" />
+        <param name="frame_period"       type="double"   value="$(arg frame_period)" />
+    </node>
+
+</launch>

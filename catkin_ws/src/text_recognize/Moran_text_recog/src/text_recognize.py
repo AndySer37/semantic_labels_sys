@@ -143,7 +143,8 @@ class text_recognize(object):
 	def predict(self, msg, img):
 		# # Preprocessing
 		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-		mask = np.zeros([480, 640], dtype = np.uint8)
+		(rows, cols, channels) = img.shape
+		mask = np.zeros([rows, cols], dtype = np.uint8)
 
 		for text_bb in msg.text_array:
 			if (text_bb.box.ymax - text_bb.box.ymin) * (text_bb.box.xmax - text_bb.box.xmin) < self.bbox_thres:

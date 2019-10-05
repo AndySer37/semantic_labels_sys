@@ -122,7 +122,7 @@ class text_detection(object):
 		except CvBridgeError as e:
 			resp.state = e
 			print(e)
-			
+
 		recog_req = text_recognize_srvRequest()
 		try:
 			rospy.wait_for_service(RECOG_SRV, timeout=10)
@@ -182,6 +182,7 @@ class text_detection(object):
 
 	def predict(self, img):
 		# # Preprocessing
+		(rows, cols, channels) = img.shape
 		image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
 		torch.cuda.synchronize()
@@ -201,7 +202,7 @@ class text_detection(object):
 		end = time.time()
 		print "Text Detection Time : {}".format(end - start)
 
-		image, contours = rescale_result(image, contours, 480, 640)
+		image, contours = rescale_result(image, contours, rows, cols)
 		img_viz = visualize_detection(image, contours)
 
 		return img_viz, contours

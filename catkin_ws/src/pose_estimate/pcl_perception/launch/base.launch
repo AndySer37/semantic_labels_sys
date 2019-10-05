@@ -1,0 +1,3 @@
+<launch>    
+    <node name="orb_process_base" pkg="pcl_perception" type="orb_process_base"  output="screen" required="true"></node>
+</launch>
