@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(pcl_perception)
+project(pose_estimation)
 
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
