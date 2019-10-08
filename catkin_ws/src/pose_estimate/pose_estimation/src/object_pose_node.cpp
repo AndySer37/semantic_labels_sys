@@ -9,10 +9,11 @@ void object_pose_node::getXYZ(float* a, float* b,float zc){
 	return;
 }
 bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs::object_only::Response &res){
+	res.count = 0;
 
 	sensor_msgs::PointCloud2::ConstPtr ros_pc = ros::topic::waitForMessage<sensor_msgs::PointCloud2>("/camera/depth_registered/points",ros::Duration());
 	pcl::fromROSMsg(*ros_pc, *input);
-
+	static tf::TransformBroadcaster br;
 	int count = 0;
 	markerArray.markers.clear();
 
@@ -68,27 +69,22 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		*output += cluster;
 		cout << "Cluster " << i << " with " << cluster_indices[i].indices.size() << " points\n";
 
-
+		//// Visual bbox
 		visualization_msgs::Marker marker;
 		geometry_msgs::Point p1,p2,p3,p4,p5,p6,p7,p8;
-
 		marker.header.frame_id = "/camera_link";
 		marker.header.stamp = ros::Time::now();
 		marker.ns = "lines";
 		marker.id = count;
 		count ++;
 		marker.type = visualization_msgs::Marker::LINE_STRIP;
-
 		marker.scale.x = 0.01;
 		marker.scale.y = 0.01;
 		marker.scale.z = 0.01;
-
 		marker.color.r = 1.0f;
 		marker.color.g = 0.0f;
 		marker.color.b = 0.0f;
 		marker.color.a = 1.0;
-
-
 		pcl::MomentOfInertiaEstimation <pcl::PointXYZRGB> feature_extractor;
 		feature_extractor.setInputCloud (p);
 		feature_extractor.compute ();
@@ -154,7 +150,32 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		marker.points.push_back(p8);
 		marker.points.push_back(p4);	
 		marker.lifetime = ros::Duration(10);
-		markerArray.markers.push_back(marker); 	
+		markerArray.markers.push_back(marker); 
+		cout << rotational_matrix_OBB << endl;
+
+		//// Visual bbox end ////
+
+		//// Publish tf and return pose
+		tf::Vector3 tran = tf::Vector3(position(0), position(1), position(2));
+		tf::Matrix3x3 rot = tf::Matrix3x3(rotational_matrix_OBB(0,0), rotational_matrix_OBB(0,1), rotational_matrix_OBB(0,2),
+												rotational_matrix_OBB(1,0), rotational_matrix_OBB(1,1), rotational_matrix_OBB(1,2),
+												rotational_matrix_OBB(2,0), rotational_matrix_OBB(2,1), rotational_matrix_OBB(2,2));
+
+		tf::Transform object_tf = tf::Transform(rot, tran);
+
+		text_msgs::object_pose ob_pose;
+		// geometry_msgs::Pose pose;
+		quaternionTFToMsg(object_tf.getRotation(), ob_pose.pose.orientation); 
+		tf::Vector3 pose_trans =  object_tf.getOrigin();
+		ob_pose.pose.position.x = pose_trans.getX();
+		ob_pose.pose.position.y = pose_trans.getY();
+		ob_pose.pose.position.z = pose_trans.getZ();
+		res.ob_list.push_back(ob_pose);
+
+		res.count += 1;
+		/////////////////////////////////////
+		br.sendTransform(tf::StampedTransform(object_tf, ros::Time::now(), target, "object" + std::to_string(count)));
+
 	} 
 	int num_cluster = cluster_indices.size();
 
@@ -168,6 +189,8 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	output->clear();
 	input->clear();
 	process->clear();
+
+	return true;
 }
 
 object_pose_node::object_pose_node(){
@@ -179,7 +202,7 @@ object_pose_node::object_pose_node(){
 	cx = msg->P[2];
 	cy = msg->P[6];
 
-	target = "camera_link";
+	target = "camera_link";  // base_link
 	source = "camera_link";
 
 	input.reset(new PointCloud<PointXYZRGB>()); 
