@@ -18,6 +18,7 @@ add_message_files(
   text_detection_array.msg
   bb_box.msg
   int_arr.msg
+  object_pose.msg
 )
 
 add_service_files(
@@ -26,6 +27,8 @@ add_service_files(
   text_recognize_srv.srv
   text_detection_srv.srv
   predict_switch.srv
+  pose_state.srv
+  object_only.srv
 )
 
 generate_messages(

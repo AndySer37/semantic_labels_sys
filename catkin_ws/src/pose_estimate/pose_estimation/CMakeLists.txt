@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   tf_conversions
   message_generation
+  text_msgs
 )
 
 catkin_package(
@@ -30,5 +31,5 @@ include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
 )
-# add_executable(orb_process_base src/orb_process_base.h src/orb_process_base.cpp)
-# target_link_libraries(orb_process_base ${catkin_LIBRARIES})
+add_executable(object_pose_node src/object_pose_node.h src/object_pose_node.cpp)
+target_link_libraries(object_pose_node ${catkin_LIBRARIES})

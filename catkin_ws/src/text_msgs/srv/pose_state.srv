@@ -1,0 +1,9 @@
+#Request data
+sensor_msgs/Image image
+sensor_msgs/Image depth
+sensor_msgs/Image mask
+---
+#Response data
+string state  # pick or suck
+int32 count
+object_pose[] ob_list

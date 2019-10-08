@@ -1,5 +1,0 @@
-<launch>    
-    <node name="pub_arti_pose" pkg="pcl_perception" type="pub_arti_pose"  output="screen" required="true"></node>
-    <node name="arti_map" pkg="pcl_perception" type="arti_map.py"  output="screen" required="true"></node>
-    <node name="subt_information" pkg="pcl_perception" type="subt_information.py"  output="screen" required="true"></node>
-</launch>

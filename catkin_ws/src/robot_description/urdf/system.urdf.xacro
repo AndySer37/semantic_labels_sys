@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<robot name="deep_flip_system" xmlns:xacro="http://ros.org/wiki/xacro">
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so"> 
+      <robotNamespace>/</robotNamespace>
+    </plugin> 
+  </gazebo>
+  <xacro:property name="M_PI" value="3.1415926535"/>
+  <!-- UR5 -->
+  <xacro:include filename="$(find robot_description)/urdf/ur5_suction_finger.urdf.xacro"/>
+  <!-- UR3 with suction -->
+  <!--xacro:include filename="$(find robot_description)/urdf/ur5_with_suction.urdf.xacro"/-->
+  <!-- Gripper -->
+  <!--xacro:include filename="$(find robotiq_description)/urdf/robotiq_85_gripper.urdf.xacro" /-->
+  <!-- Color material -->
+  <material name="black">
+    <color rgba="0.2 0.2 0.2 1.0"/>
+  </material>
+  <material name="green">
+    <color rgba="0.0 1.0 0.0 1.0"/>
+  </material>
+  <xacro:ur5_robot prefix="" joint_limited="false"/>
+  <!-- SR300 above conveyor -->
+  <link name="camera1_link">
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="${M_PI/2} 0.0 ${M_PI/2}"/>
+      <geometry>
+        <mesh filename="package://realsense2_camera/meshes/RealSense 90deg.STL" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <!-- For original version
+  <joint name="arm2cam1_joint" type="fixed">
+    <origin xyz="-0.673540 -0.035113 0.726538"
+            rpy="0.049012 1.178053 0.051708"/>
+    <parent link="base_link"/>
+    <child link="camera1_link"/>
+  </joint>
+  !-->
+  <!-- For ICT demo -->
+  <joint name="arm2cam1_joint" type="fixed">
+    <origin xyz="-0.755580 -0.054556 0.784186"
+            rpy="0.047026 1.137168 0.063290"/>
+    <parent link="base_link"/>
+    <child link="camera1_link"/>
+  </joint>
+  <!-- SR300 toward UR3 -->
+  <!--link name="camera2_link">
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="${M_PI/2} 0.0 ${M_PI/2}"/>
+      <geometry>
+        <mesh filename="package://realsense2_camera/meshes/RealSense 90deg.STL" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <joint name="arm2cam2_joint" type="fixed">
+    <origin xyz="-0.0368148 0.966091 0.409279" rpy="0.016628 0.132712 -1.55129"/>
+    <parent link="base_link"/>
+    <child link="camera2_link"/>
+  </joint-->
+  <!-- Gripper coupler -->
+  <!--
+  <link name="gripper_coupler_link">
+    <visual>
+      <origin xyz="0.004 0.0 0.0" rpy="0.0 ${-M_PI/2} 0.0"/>
+      <geometry>
+        <mesh filename="package://robotiq_description/meshes/robotiq_85_coupler.stl"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <joint name="ee_link2coupler_joint" type="fixed">
+    <parent link="ee_link"/>
+    <child link="gripper_coupler_link"/>
+  </joint>
+  <link name="gripper_root_link"/>
+  <joint name="ee2gripper_joint" type="fixed">
+    <parent link="ee_link"/>
+    <child link="gripper_root_link"/>
+    <origin xyz="0.011 0.0 0.0" rpy="${M_PI} 0.0 0.0"/>
+  </joint>
+  <xacro:robotiq_85_gripper prefix="" parent="gripper_root_link">
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </xacro:robotiq_85_gripper>
+  -->
+</robot> 

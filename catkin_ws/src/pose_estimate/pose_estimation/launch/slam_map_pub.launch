@@ -1,4 +1,0 @@
-<launch>    
-    <node name="orb_process" pkg="pcl_perception" type="orb_process"  output="screen" required="true"></node>
-    <node name="danger_detector" pkg="pcl_perception" type="danger_detector"  output="screen" required="true"></node>
-</launch>
