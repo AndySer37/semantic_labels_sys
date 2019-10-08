@@ -29,6 +29,7 @@ add_service_files(
   predict_switch.srv
   pose_state.srv
   object_only.srv
+  bn_pose_srv.srv
 )
 
 generate_messages(

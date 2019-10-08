@@ -20,6 +20,7 @@ import rospkg
 from cv_bridge import CvBridge, CvBridgeError
 
 Object_Pose_SRV = "/object_pose/oject_pose_server"
+Brand_name_Pose_SRV = "/bn_pose/bn_pose_server"
 
 class depth_to_pose():
 	def __init__(self):
@@ -61,11 +62,27 @@ class depth_to_pose():
 				recog_resp = recognition_srv(object_req)
 			except (rospy.ServiceException, rospy.ROSException), e:
 				resp.state = e
+			resp.count = recog_resp.count
+			resp.ob_list = recog_resp.ob_list
 
 		else:
+			bn_req = bn_pose_srvRequest()
+			bn_req.count = len(upward_list) - 1
 			for i in upward_list:
 				if i != 0:
+					bn_req.list.append(i)
+			try:
+				rospy.wait_for_service(Brand_name_Pose_SRV, timeout=10)
+				bn_req.image = req.image
+				bn_req.depth = req.depth
+				bn_req.mask = req.mask
+				recognition_srv = rospy.ServiceProxy(Brand_name_Pose_SRV, bn_pose_srv)
+				recog_resp = recognition_srv(bn_req)
+			except (rospy.ServiceException, rospy.ROSException), e:
+				resp.state = e
 
+			resp.count = recog_resp.count
+			resp.ob_list = recog_resp.ob_list	
 		return resp
 
 	def read_commodity(self, path):
