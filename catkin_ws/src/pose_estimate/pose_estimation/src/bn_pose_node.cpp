@@ -15,8 +15,8 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 	int count = 0;
 	markerArray.markers.clear();
 
-	std::vector<int> indices;
-	pcl::removeNaNFromPointCloud(*input, *input, indices);
+	// std::vector<int> indices;
+	// pcl::removeNaNFromPointCloud(*input, *input, indices);
 
 	tf::StampedTransform transform;
 	static tf::TransformListener listener;
@@ -45,9 +45,10 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 
 	for(int cls = 0; cls < req.count; cls++){
 		input->clear();
+		// cout << req.list[cls] <<endl;
 		for( int nrow = 0; nrow < img_ptr_depth->image.rows; nrow++){  
 			for(int ncol = 0; ncol < img_ptr_depth->image.cols; ncol++){  
-				if (img_ptr_depth->image.at<unsigned short int>(nrow,ncol) == req.list[cls]){
+				if (img_ptr_mask->image.at<uint8_t>(nrow,ncol) == req.list[cls] && img_ptr_depth->image.at<unsigned short int>(nrow,ncol) > 0.01){
 
 					//cout << img_ptr_depth->image.at<unsigned short int>(nrow,ncol) << endl;
 					pcl::PointXYZRGB point;
@@ -71,12 +72,14 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 				} 
 			}  
 		} 
-
 		pcl::transformPointCloud(*input, *process, eigen_tf);
 
 		// downsample the pc
 		downsample.setInputCloud (process);
 		downsample.filter (*process);
+		// outlier removal
+		sor.setInputCloud(process);
+		sor.filter(*process);
 
 
 		//// Visual bbox
@@ -184,10 +187,11 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 
 		res.count += 1;
 		/////////////////////////////////////
-		br.sendTransform(tf::StampedTransform(object_tf, ros::Time::now(), target, "object" + std::to_string(count)));
-
+		br.sendTransform(tf::StampedTransform(object_tf, ros::Time::now(), source, "object" + std::to_string(count)));
+		*output += *process;
 		
 	}
+	cout << output->points.size() << endl;
 
 	sensor_msgs::PointCloud2 object_cloud_msg;
 	toROSMsg(*output, object_cloud_msg);
@@ -212,14 +216,16 @@ bn_pose_node::bn_pose_node(){
 	cx = msg->P[2];
 	cy = msg->P[6];
 
-	target = "camera_link";  // base_link
+	target = "camera_color_optical_frame";  // base_link
 	source = "camera_link";
 
 	input.reset(new PointCloud<PointXYZRGB>()); 
 	output.reset(new PointCloud<PointXYZRGB>());
 	process.reset(new PointCloud<PointXYZRGB>());
 
-	downsample.setLeafSize (0.015, 0.015, 0.015);
+	sor.setMeanK (10);
+	sor.setStddevMulThresh (0.8);
+	downsample.setLeafSize (0.01, 0.01, 0.01);
 
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2> ("pc", 10);

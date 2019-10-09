@@ -33,6 +33,8 @@ include_directories(
 )
 add_executable(object_pose_node src/object_pose_node.h src/object_pose_node.cpp)
 target_link_libraries(object_pose_node ${catkin_LIBRARIES})
+add_dependencies(object_pose_node src/object_pose_node.cpp ${catkin_EXPORTED_TARGETS})
 
 add_executable(bn_pose_node src/bn_pose_node.h src/bn_pose_node.cpp)
 target_link_libraries(bn_pose_node ${catkin_LIBRARIES})
+add_dependencies(bn_pose_node src/bn_pose_node.cpp ${catkin_EXPORTED_TARGETS})

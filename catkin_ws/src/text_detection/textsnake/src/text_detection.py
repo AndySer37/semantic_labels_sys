@@ -38,7 +38,7 @@ class text_detection(object):
 	def __init__(self):
 		self.switch = False
 		r = rospkg.RosPack()
-		self.path = r.get_path('TextSnake')
+		self.path = r.get_path('textsnake')
 		self.prob_threshold = 0.90
 		self.cv_bridge = CvBridge() 
 		self.means = (0.485, 0.456, 0.406)

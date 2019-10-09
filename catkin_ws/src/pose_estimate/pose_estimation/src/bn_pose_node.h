@@ -27,6 +27,9 @@
 #include <unistd.h>
 // Pcl downsampling
 #include <pcl/filters/voxel_grid.h>
+// Pcl outlier removal
+#include <pcl/filters/conditional_removal.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 
 #include <pcl/features/moment_of_inertia_estimation.h>
 #include <pcl/common/common.h>
@@ -61,6 +64,7 @@ class bn_pose_node{
     float upper_bound, lower_bound;
 
     VoxelGrid<PointXYZRGB> downsample;
+    StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;
 
     visualization_msgs::MarkerArray markerArray;
 };

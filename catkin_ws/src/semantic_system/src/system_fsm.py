@@ -1,243 +1,204 @@
 #!/usr/bin/env python
-import sys
-import time
-from math import pi
-import numpy as np
 
+import roslib
 import rospy
-import actionlib
-import tf
-import cv2
-from cv_bridge import CvBridge, CvBridgeError
+import smach
+import smach_ros
+from text_msgs.srv import *
+from text_msgs.msg import *
 
-# ROS Msg
-from nav_msgs.msg import Odometry
-from std_msgs.msg import String, Int32, Float64, Bool
-from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
-from robot_navigation.srv import robot_navigation
-from apriltags2_ros.msg import AprilTagDetectionArray, AprilTagDetection
+Detect_SRV = "/text_detection/text_detection"
+Pose_SRV = "/depth_to_pose/get_pose"
+mani_req = manipulationRequest()
 
-# Competition ROS Srv
-from robot_navigation.srv import robot_navigation
-from object_detection.srv import task1out
-from pose_estimate_and_pick.srv import task2_srv
-from place_to_box.srv import home, tag
-from std_srvs.srv import *
-from final_round.srv import *
+class Perception(smach.State):
+    def __init__(self, per_client, pose_client):
+        smach.State.__init__(
+            self,
+            outcomes=['finish'])
+        self.per_client = per_client
+        self.pose_client = pose_client
 
-# Available service name
-NAVIGATION_SRV  = 'robot_navigate'
-TASK1_SRV       = 'prediction'
-TASK2_SRV       = 'task2'
-GRIP_PLACE_SRV  = 'place_to_box'
-GRIP_HOME_SRV   = 'home'
-GRIP_CLOSE_SRV  = 'close'
-GRIP_OPEN_SRV   = 'open_grip'
+    def execute(self, userdata):
+        global mani_req
+        mani_req =  manipulationRequest()
 
+        per_res = self.per_client() #Call service
+        pose_req = pose_stateRequest()
+        pose_req.image = per_res.image
+        pose_req.depth = per_res.depth 
+        pose_req.mask = per_res.mask
+        pose_res = self.pose_client(pose_req)
 
-class final_round_node():
-    def __init__(self):
-        self.cv_bridge = CvBridge()
-        # self.odom_sub   = rospy.Subscriber("/odometry/filtered", Odometry, self.odom_cb)
-        self.tag_sub = rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.tag_cb, queue_size = 1)
-        self.cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
-        self.trigger_srv    = rospy.Service("final_task_trigger", Trigger, self.final_trigger_cb)
-        self.state_srv      = rospy.Service("final_goto_state", GotoState, self.set_state_cb)
-
-        self.x = 0
-        self.y = 0
-        self.yaw = 0
-        self.tags_insight = []
-        self.target_tag = 5 # face to object platform
-        self.num_obj = 3 
-        self.fsm_state = 0
-        self.motion_trigger = False
+        # mani_req.brandname = res.brand
+        # mani_req.target = res.pose
+        # if res.result_type == 0:
+        #     mani_req.mode = 0
+        #     rospy.loginfo("Brand name is visible")
+        #     return 'v'
+        # elif res.result_type == 1:
+        #     mani_req.mode = 2
+        #     rospy.loginfo("Object is visible")
+        #     return 'nv'
+        # else:
+        print pose_res.count 
+        rospy.loginfo("No object. Finish the task")
+        return "finish"
 
 
-    def set_state_cb(self, req):
-        # Set FSM's state 
-        if self.fsm_state != req.data:
-            rospy.loginfo('Final Task switch state from %d to %d' % (self.fsm_state, req.data))
-            self.fsm_state = req.data
-        resp = GotoStateResponse()
-        resp.success = True
-        return resp
 
-    def final_trigger_cb(self, req):
-        # Start and Stop FSM
-        self.motion_trigger = not (self.motion_trigger)
-        if self.motion_trigger == True:
-            rospy.loginfo('Final Task state:%2d Run' % self.fsm_state)
-        else: rospy.loginfo('Final Task state:%2d Stop' % self.fsm_state)
-        resp = TriggerResponse()
-        resp.success = True
-        return resp
+# class Perception_gripper(smach.State):
+#     def __init__(self, per_client):
+#         smach.State.__init__(
+#             self,
+#             outcomes=['v', 'nv', 'np'])
+#         self.per_client = per_client
+#         self.try_num = 0
+        
+#     def execute(self, userdata):
+#         global mani_req
+#         res = self.per_client(2)
+#         mani_req =  manipulationRequest()
+#         mani_req.brandname = res.brand
+#         mani_req.target = res.pose
+#         if res.result_type == 0:
+#             rospy.loginfo("Brand name is visible")
+#             mani_req.mode = 6
+#             return "v"
+#         elif res.result_type == 1:
+#             rospy.loginfo("Brand name is invisible")
+#             if self.try_num == 0:
+#                 mani_req.mode = 4
+#                 self.try_num += 1
+#                 return "nv"
+#             else:
+#                 mani_req.mode = 5
+#                 self.try_num = 0
+#                 rospy.loginfo("Fail this trial")
+#                 return 'np'
+#         else:
+#             mani_req.mode = 5
+#             self.try_num = 0
+#             rospy.loginfo("Fail this trial")
+#             return 'np'
 
-    def tag_cb(self, msg):
-        self.tags_insight = msg.detections
-
-    def odom_cb(self, msg):
-        self.x = msg.pose.pose.position.x
-        self.y = msg.pose.pose.position.y
-        q = [ msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, \
-              msg.pose.pose.orientation.z, msg.pose.pose.orientation.w ]
-        euler = tf.transformations.euler_from_quaternion(q)
-        self.yaw = euler[2]
-        # print self.x, self.y, self.yaw
-
-    def tag_detection(self, target_id):
-        if len(self.tags_insight) == 0:
-            return False
-        else:    
-            for tags in self.tags_insight:
-                if tags.id[0] == target_id: return True           
-
-    def fsm_transit(self, state_to_transit):
-        self.fsm_state = state_to_transit
-
-    def process(self):
-        if self.fsm_state == 0:
-            print 'Robot Initialization'
-            try:    # Wait for rosservice ready
-                rospy.wait_for_service(NAVIGATION_SRV, timeout=10)
-                self.fsm_transit(2)
-                print 'skipppppppppppp state 1'
-            except (rospy.ServiceException, rospy.ROSException), e:
-                rospy.logerr('State:%2d, error: %s' % (self.fsm_state, e))
-                self.fsm_transit(99)
+# class Pick_and_place(smach.State):
+#     def __init__(self, act_client):
+#         smach.State.__init__(
+#             self,
+#             outcomes=['finish']
+#             )
+#         self.act_client = act_client
+        
+#     def execute(self, userdata):
+#         global mani_req
+#         self.act_client(mani_req) 
+#         return 'finish'
 
 
-        if self.fsm_state == 1:
-            print 'Finding tag 5'
-            # Check whether tag 5 is in sight?
-            try:
-                self.target_tag = 5
-                stat = rospy.wait_for_message("odom", Odometry, timeout=3)
-                theta = stat.twist.twist.angular.z  
-                if theta == 0:
-                    theta = 0.75
-                if self.tag_detection(self.target_tag) == False:
-                    cmd = Twist()
-                    cmd.angular.z = theta/abs(theta) * 0.1
-                    self.cmd_pub.publish(cmd)
-                    rospy.logerr('Tag%2d is not in sight!' % self.target_tag)
-                else:
-                    print 'Got tag 5'
-                    cmd = Twist()
-                    cmd.angular.z = 0
-                    self.cmd_pub.publish(cmd)
-                    self.fsm_transit(2)
-
-            except (rospy.ServiceException, rospy.ROSException), e:
-                rospy.logerr('State:%2d, error: %s' % (self.fsm_state, e))
-                self.fsm_transit(99)        
+# class Pick_to_uncluttered_tote(smach.State):
+#     def __init__(self, act_client):
+#         smach.State.__init__(
+#             self,
+#             outcomes=['finish'])
+#         self.act_client = act_client
+        
+#     def execute(self, userdata):
+#         global mani_req
+#         self.act_client(mani_req)
+#         return 'finish'
 
 
-        if self.fsm_state == 2:
-            # Count the object number to check whether the robot finished the task
-            try:
-                if self.num_obj == 0:
-                    self.fsm_transit(88)
-                    return
-                self.fsm_transit(3)
-            except (rospy.ServiceException, rospy.ROSException), e:
-                rospy.logerr('State:%2d, error: %s' % (self.fsm_state, e))
-                self.fsm_transit(99)
+# class Pick(smach.State):
+#     def __init__(self, act_client):
+#         smach.State.__init__(
+#             self,
+#             outcomes=['finish'])
+#         self.act_client = act_client
+        
+#     def execute(self, userdata):
+#         global mani_req
+#         self.act_client(mani_req)
+#         return 'finish'
+
+# class Change_object_pose(smach.State):
+#     def __init__(self, act_client):
+#         smach.State.__init__(
+#             self,
+#             outcomes=['finish'])
+#         self.act_client = act_client
+        
+#     def execute(self, userdata):
+#         global mani_req
+#         self.act_client(mani_req)
+#         return 'finish'
 
 
-        if self.fsm_state == 3:
-            print 'predicting and picking the object'
-            try:
-                rospy.wait_for_service(TASK2_SRV, timeout=10)
-                grip_open = rospy.ServiceProxy(GRIP_OPEN_SRV, home)
-                task2_resp = grip_open()
-                predict_and_pick = rospy.ServiceProxy(TASK2_SRV, task2_srv)
-                task2_resp = predict_and_pick()
-                str1 = task2_resp.tag_id
-                if str1.find('Fail') == -1: # if task2 success, get the id related the picked obj
-                    self.target_tag = int(task2_resp.tag_id)
-                    self.fsm_transit(5)
-                    print 'skipppppppppppp state 4'
-                else: rospy.sleep(3)
-            except (rospy.ServiceException, rospy.ROSException), e:
-                rospy.logerr('State:%2d, error: %s' % (self.fsm_state, e))
-                self.fsm_transit(99)
+# class Put_back_to_tote(smach.State):
+#     def __init__(self, act_client):
+#         smach.State.__init__(
+#             self,
+#             outcomes=['finish'])
+#         self.act_client = act_client
+#         global mani_req
+#     def execute(self, userdata):
+#         self.act_client(mani_req)
+#         return 'finish'
 
 
-        if self.fsm_state == 4:
-            print 'Moving to target tag %d' % self.target_tag
-            try:
-                rospy.wait_for_service(NAVIGATION_SRV, timeout=3)
-                car_move = rospy.ServiceProxy(NAVIGATION_SRV, robot_navigation)
-                task3_resp = car_move(self.target_tag)
-                self.fsm_transit(5)
-                rospy.sleep(2)
-            except (rospy.ServiceException, rospy.ROSException), e:
-                rospy.logerr('State:%2d, error: %s' % (self.fsm_state, e))
-                self.fsm_transit(99)
+
+def main():
+    rospy.init_node('Semantic_System')
+    rospy.wait_for_service(Detect_SRV)
+    rospy.wait_for_service(Pose_SRV)
+
+    print "Server Ready !!!"
+    perception_client = rospy.ServiceProxy(Detect_SRV, text_detection_srv)
+    pose_client = rospy.ServiceProxy(Pose_SRV, pose_state)
+    # action_client = rospy.ServiceProxy('manipulation_server', manipulation)
+    # Create a SMACH state machine
+    sm = smach.StateMachine(outcomes=['Finish'])
+    
+    with sm:
+        # Add Perception_tote state to the container
+        smach.StateMachine.add('Perception', Perception(perception_client, pose_client),
+            transitions={'finish':'Finish'})
+            
+        # # Add Perception_platform state to the container    
+        # smach.StateMachine.add('Perception_platform', Perception_platform(perception_client),
+        #     transitions={'v':'Pick_and_place', 'nv':'Perception_tote'})
+        # # # Add Perception_gripper state to the container         
+        # smach.StateMachine.add('Perception_gripper', Perception_gripper(perception_client),
+        #     transitions={'v':'Pick_and_place',
+        #     'nv':'Change_object_pose', 'np':'Put_back_to_tote'})
 
 
-        if self.fsm_state == 5:
-            print 'Placing the object'
-            try:
-                rospy.wait_for_service(GRIP_PLACE_SRV, timeout=3)
-                place = rospy.ServiceProxy(GRIP_PLACE_SRV, tag)
-                task4_resp = place(self.target_tag)
-                str1 = task4_resp.result
-                if str1.find('Successful') == -1:
-                    rospy.logerr(str1)
-                    '''
-                    Todo: deal with condition of pick fail
-                    '''
-                    self.fsm_transit(99)
-                    return
-                rospy.loginfo(str1)
-                self.num_obj = self.num_obj - 1
-                self.fsm_transit(1)
-                print 'skipppppppppppp state 6'
-
-            except (rospy.ServiceException, rospy.ROSException), e:
-                rospy.logerr('State:%2d, error: %s' % (self.fsm_state, e))
-                self.fsm_transit(99)
+        # # Add Pick_to_uncluttered_tote state to the container
+        # smach.StateMachine.add('Pick_to_uncluttered_tote', Pick_to_uncluttered_tote(action_client),
+        #     transitions={'finish':'Perception_platform'})#Perception_platform
 
 
-        if self.fsm_state == 6:
-            print 'Way home tag %d' % self.target_tag
-            try:
-                self.target_tag = 5
-                car_move = rospy.ServiceProxy(NAVIGATION_SRV, robot_navigation)
-                task3_resp = car_move(self.target_tag)
-                self.fsm_transit(1)
-                rospy.sleep(2)
-            except (rospy.ServiceException, rospy.ROSException), e:
-                rospy.logerr('State:%2d, error: %s' % (self.fsm_state, e))
-                self.fsm_transit(99)
+        # # Add Pick_and_place state to the container
+        # smach.StateMachine.add('Pick_and_place', Pick_and_place(action_client),
+        #     transitions={'finish':'Perception_tote'})
 
+        # # Add Pick_and_check2 state to the container
+        # smach.StateMachine.add('Pick', Pick(action_client),
+        #     transitions={'finish':'Perception_gripper'})
+        # # Add Change_object_pose state to the container
+        # smach.StateMachine.add('Change_object_pose', Change_object_pose(action_client),
+        #     transitions={'finish':'Perception_gripper'})
+ 
+        # # Add Put_back_to_tote state to the container
+        # smach.StateMachine.add('Put_back_to_tote', Put_back_to_tote(action_client),
+        #     transitions={'finish':'Perception_tote'})
 
-        if self.fsm_state == 88:
-            rospy.loginfo('Finish the tasks!')
-            self.timer.shutdown()
-            exit(-1)
-
-        if self.fsm_state == 99:                  # Error state
-            print('Node error')
-            rospy.sleep(5)
-
-        rospy.sleep(1.0)
-
-    def onShutdown(self):
-        rospy.loginfo("Node shutdown")
-
-def main(args):
-    rospy.init_node('final_round_node', anonymous = True)
-    task5 = final_round_node()
-    rospy.on_shutdown(task5.onShutdown)
-
-    while not rospy.is_shutdown():
-        if task5.motion_trigger == True:
-            task5.process()
-        rospy.sleep(1.0)
+    semantic_system = smach_ros.IntrospectionServer('Active_manipulation', sm,
+        '/Active_manipulation')
+    semantic_system.start()
+    outcome = sm.execute()
     rospy.spin()
+    semantic_system.stop()
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main()

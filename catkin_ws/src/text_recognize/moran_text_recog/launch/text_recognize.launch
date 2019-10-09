@@ -1,0 +1,4 @@
+<?xml version="1.0" ?>
+<launch>
+  <node pkg="moran_text_recog" type="text_recognize.py" name="text_recognize" output="screen"/>
+</launch>

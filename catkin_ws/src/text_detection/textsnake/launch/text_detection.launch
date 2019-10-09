@@ -1,0 +1,4 @@
+<?xml version="1.0" ?>
+<launch>
+  <node pkg="textsnake" type="text_detection.py" name="text_detection" output="screen"/>
+</launch>

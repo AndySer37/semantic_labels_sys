@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
 <launch>
-  <include file="$(find TextSnake)/launch/text_detection.launch"></include>
-  <include file="$(find Moran_text_recog)/launch/text_recognize.launch"></include>   
+  <include file="$(find textsnake)/launch/text_detection.launch"></include>
+  <include file="$(find moran_text_recog)/launch/text_recognize.launch"></include>   
 </launch>

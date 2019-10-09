@@ -1,3 +1,5 @@
 <launch>    
-    <node name="pose_estimation" pkg="pose_estimation" type="depth_to_pose.py"  output="screen" required="true"></node>
+    <node name="depth_to_pose" pkg="pose_estimation" type="depth_to_pose.py"  output="screen" required="true"></node>
+    <node name="bn_pose_node" pkg="pose_estimation" type="bn_pose_node"  output="screen" required="true"></node>
+    <node name="object_pose_node" pkg="pose_estimation" type="object_pose_node"  output="screen" required="true"></node>
 </launch>

@@ -31,7 +31,7 @@ from collections import OrderedDict
 class text_recognize(object):
 	def __init__(self):
 		r = rospkg.RosPack()
-		self.path = r.get_path('Moran_text_recog')
+		self.path = r.get_path('moran_text_recog')
 		self.prob_threshold = 0.90
 		self.cv_bridge = CvBridge()
 		self.commodity_list = []

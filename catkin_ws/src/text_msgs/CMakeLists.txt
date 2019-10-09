@@ -30,6 +30,7 @@ add_service_files(
   pose_state.srv
   object_only.srv
   bn_pose_srv.srv
+  manipulation.srv
 )
 
 generate_messages(
