@@ -31,6 +31,7 @@ from util.config import config as cfg, update_config, print_config
 from util.option import BaseOptions
 from util.visualize import visualize_detection
 from util.misc import to_device, mkdirs, rescale_result
+from rotate_input import rotate_cv, rotate_back, rotate_back_change_h_w
 
 RECOG_SRV = "/text_recognize/text_recognize_server"
 
@@ -39,10 +40,14 @@ class text_detection(object):
 		self.switch = False
 		r = rospkg.RosPack()
 		self.path = r.get_path('textsnake')
+		self.commodity_list = []
+		self.read_commodity(r.get_path('text_msgs') + "/config/commodity_list.txt")
 		self.prob_threshold = 0.90
 		self.cv_bridge = CvBridge() 
 		self.means = (0.485, 0.456, 0.406)
 		self.stds = (0.229, 0.224, 0.225)
+
+		self.color_map = [(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,255,255)] # 0 90 180 270 noise
 
 		self.objects = []
 		self.network = TextNet(is_training=False, backbone='vgg')
@@ -61,6 +66,8 @@ class text_detection(object):
 		#### Publisher
 		self.image_pub = rospy.Publisher("~predict_img", Image, queue_size = 1)
 		self.img_bbox_pub = rospy.Publisher("~predict_bbox", Image, queue_size = 1)
+		self.predict_img_pub = rospy.Publisher("/prediction_img", Image, queue_size = 1)
+		self.predict_mask_pub = rospy.Publisher("/prediction_mask", Image, queue_size = 1)
 		self.text_detection_pub = rospy.Publisher("/text_detection_array", text_detection_array, queue_size = 1)
 		### service
 		self.predict_switch_ser = rospy.Service("~predict_switch_server", predict_switch, self.switch_callback)
@@ -71,6 +78,13 @@ class text_detection(object):
 		ts = message_filters.TimeSynchronizer([image_sub, depth_sub], 10)
 		ts.registerCallback(self.callback)
 		print "============ Ready ============"
+
+	def read_commodity(self, path):
+
+		for line in open(path, "r"):
+			line = line.rstrip('\n')
+			self.commodity_list.append(line)
+		print "Finish reading list"
 
 	def srv_callback(self, req):
 		text_array = text_detection_array()
@@ -89,51 +103,79 @@ class text_detection(object):
 			resp.status = e
 			print(e)
 		
-		# (rows, cols, channels) = cv_image.shape
-		# self.width = cols
-		# self.height = rows
-		
-		predict_img, contours = self.predict(cv_image)
-		img_bbox = cv_image.copy()
+		mask = np.zeros([cv_image.shape[0], cv_image.shape[1]], dtype = np.uint8)
+		img_list_0_90_180_270 = rotate_cv(cv_image)
 
-		text_array = text_detection_array()
-		text_array.image = img_msg
-		text_array.depth = resp.depth
-		for _cont in contours:
-			text_bb = text_detection_msg()
-			for p in _cont:
-				int_array = int_arr()
-				int_array.point.append(p[0])
-				int_array.point.append(p[1])
-				text_bb.contour.append(int_array)
-			# cv2.drawContours(cv_image, [_cont], -1, (0, 255, 0), 2)
-			text_bb.box.xmin = min(_cont[:,0])
-			text_bb.box.xmax = max(_cont[:,0])
-			text_bb.box.ymin = min(_cont[:,1])
-			text_bb.box.ymax = max(_cont[:,1])
-			text_array.text_array.append(text_bb)
-			cv2.rectangle(img_bbox, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (255, 0, 0), 3)
-		text_array.bb_count = len(text_array.text_array)
-		# self.text_detection_pub.publish(text_array)
+		for i in range(4):
 
-		try:
-			self.image_pub.publish(self.cv_bridge.cv2_to_imgmsg(predict_img, "bgr8"))
-			self.img_bbox_pub.publish(self.cv_bridge.cv2_to_imgmsg(img_bbox, "bgr8"))
-		except CvBridgeError as e:
-			resp.state = e
-			print(e)
+			predict_img, contours = self.predict(img_list_0_90_180_270[i])
+			img_bbox = img_list_0_90_180_270[i].copy()
 
-		recog_req = text_recognize_srvRequest()
-		try:
-			rospy.wait_for_service(RECOG_SRV, timeout=10)
-			recog_req.data = text_array
-			recognition_srv = rospy.ServiceProxy(RECOG_SRV, text_recognize_srv)
-			recog_resp = recognition_srv(recog_req)
-		except (rospy.ServiceException, rospy.ROSException), e:
-			resp.state = e
-		resp.mask = recog_resp.mask
+			text_array = text_detection_array()
+			text_array.image = self.cv_bridge.cv2_to_imgmsg(img_list_0_90_180_270[i], "bgr8")
+			text_array.depth = resp.depth
+			for _cont in contours:
+				text_bb = text_detection_msg()
+				for p in _cont:
+					int_array = int_arr()
+					int_array.point.append(p[0])
+					int_array.point.append(p[1])
+					text_bb.contour.append(int_array)
+				cv2.drawContours(predict_img, [_cont], -1, self.color_map[i], 3)
+				text_bb.box.xmin = min(_cont[:,0])
+				text_bb.box.xmax = max(_cont[:,0])
+				text_bb.box.ymin = min(_cont[:,1])
+				text_bb.box.ymax = max(_cont[:,1])
+				text_array.text_array.append(text_bb)
+				cv2.rectangle(img_bbox, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), self.color_map[i], 3)
+			text_array.bb_count = len(text_array.text_array)
+			# self.text_detection_pub.publish(text_array)
+			
+			recog_req = text_recognize_srvRequest()
+			try:
+				rospy.wait_for_service(RECOG_SRV, timeout=10)
+				recog_req.data = text_array
+				recog_req.direct = i
+				recognition_srv = rospy.ServiceProxy(RECOG_SRV, text_recognize_srv)
+				recog_resp = recognition_srv(recog_req)
+			except (rospy.ServiceException, rospy.ROSException), e:
+				resp.state = e
+
+			recog_mask = self.cv_bridge.imgmsg_to_cv2(recog_resp.mask, "8UC1")
+
+			if i == 0:
+				pass
+			elif i == 1:
+				recog_mask = rotate_back_change_h_w(recog_mask, angle = -90)
+				predict_img = rotate_back_change_h_w(predict_img, angle = -90)
+				img_bbox = rotate_back_change_h_w(img_bbox, angle = -90)
+			elif i == 2:
+				recog_mask = rotate_back(recog_mask, angle = -180)
+				predict_img = rotate_back(predict_img, angle = -180)
+				img_bbox = rotate_back(img_bbox, angle = -180)
+			else:
+				recog_mask = rotate_back_change_h_w(recog_mask, angle = -270)
+				predict_img = rotate_back_change_h_w(predict_img, angle = -270)
+				img_bbox = rotate_back_change_h_w(img_bbox, angle = -270)
+
+			mask[recog_mask != 0] = recog_mask[recog_mask != 0]
+
+			try:
+				self.image_pub.publish(self.cv_bridge.cv2_to_imgmsg(predict_img, "bgr8"))
+				self.img_bbox_pub.publish(self.cv_bridge.cv2_to_imgmsg(img_bbox, "bgr8"))
+			except CvBridgeError as e:
+				resp.state = e
+				print(e)
+
+		## publish visualization
+		self.img_show(mask, cv_image)
+		resp.mask = self.cv_bridge.cv2_to_imgmsg(mask, "8UC1")
+		vis_mask = np.zeros([cv_image.shape[0], cv_image.shape[1]], dtype = np.uint8)
+		vis_mask[mask != 0] = 255 - mask[mask != 0]
+		## srv end
+		self.predict_img_pub.publish(self.cv_bridge.cv2_to_imgmsg(cv_image, "bgr8"))
+		self.predict_mask_pub.publish(self.cv_bridge.cv2_to_imgmsg(vis_mask, "8UC1"))
 		return resp
-
 
 	def callback(self, img_msg, depth):
 		if not self.switch:
@@ -179,6 +221,28 @@ class text_detection(object):
 			self.img_bbox_pub.publish(self.cv_bridge.cv2_to_imgmsg(img_bbox, "bgr8"))
 		except CvBridgeError as e:
 			print(e)
+
+	def img_show(self, mask, img):
+		obj_num = len(self.commodity_list)
+		_list = np.unique(mask)
+		print _list
+		for i in _list:			# self.commodity_list
+			obj = i % obj_num
+			direct = int(i / obj_num)
+			if obj != 0:
+				mask_i = mask.copy()
+				mask_i[mask_i != i] = 0
+				_, contours, hierarchy = cv2.findContours(mask_i, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+				for j in range(len(contours)):
+					cnt = contours[j]
+					area = cv2.contourArea(cnt) 
+					if area > 3000:
+						cv2.drawContours(img, [cnt], -1, self.color_map[direct], 3)
+						x,y,w,h = cv2.boundingRect(cnt)
+						word = self.commodity_list[obj] + " " + str(direct*90)
+						cv2.putText(img, word, (x, y), 0, 1, (0, 255, 255),2)
+
 
 	def predict(self, img):
 		# # Preprocessing

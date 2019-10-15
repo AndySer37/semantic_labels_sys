@@ -42,6 +42,8 @@ class text_recognize(object):
 		self.stds = (0.229, 0.224, 0.225)
 		self.bbox_thres = 3000
 
+		self.color_map = [(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,255,255)] # 0 90 180 270 noise
+
 		self.objects = []
 		self.is_compressed = False
 
@@ -126,7 +128,7 @@ class text_recognize(object):
 			resp.state = e
 			print(e)
 		
-		predict_img, mask = self.predict(req.data, cv_image)
+		predict_img, mask = self.predict(req.data, cv_image, req.direct)
 		img_bbox = cv_image.copy()
 
 		try:
@@ -140,7 +142,7 @@ class text_recognize(object):
 
 		return resp
 
-	def predict(self, msg, img):
+	def predict(self, msg, img, rot=0):
 		# # Preprocessing
 		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 		(rows, cols, channels) = img.shape
@@ -185,8 +187,8 @@ class text_recognize(object):
 			end = time.time()
 			print "Text Recognize Time : {}".format(end - start)
 			if sim_preds in self.commodity_list:
-				cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (255, 0, 0), 3)
-				cv2.putText(img, sim_preds, (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 0, 255),3)
+				cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), self.color_map[rot], 3)
+				cv2.putText(img, sim_preds, (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 255, 255),3)
 				_cont = []
 				for p in text_bb.contour:
 					point = []
@@ -194,7 +196,7 @@ class text_recognize(object):
 					point.append(p.point[1])
 					_cont.append(point)
 				_cont = np.array(_cont, np.int32)
-				cv2.fillConvexPoly(mask, _cont, 255-self.commodity_list.index(sim_preds))
+				cv2.fillConvexPoly(mask, _cont, self.commodity_list.index(sim_preds) + rot*len(self.commodity_list))
 
 			else:
 				cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (0, 0, 0), 2)
