@@ -47,6 +47,8 @@ class text_detection(object):
 		self.means = (0.485, 0.456, 0.406)
 		self.stds = (0.229, 0.224, 0.225)
 
+		self.saver = True
+
 		self.color_map = [(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,255,255)] # 0 90 180 270 noise
 
 		self.objects = []
@@ -77,6 +79,21 @@ class text_detection(object):
 		depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
 		ts = message_filters.TimeSynchronizer([image_sub, depth_sub], 10)
 		ts.registerCallback(self.callback)
+		self.saver_count = 6
+		if self.saver:
+			self.p_img = os.path.join(self.path, "saver", "img")
+			if not os.path.exists(self.p_img):
+				os.makedirs(self.p_img)
+			self.p_depth = os.path.join(self.path, "saver", "depth")
+			if not os.path.exists(self.p_depth):
+				os.makedirs(self.p_depth)
+			self.p_mask = os.path.join(self.path, "saver", "mask")
+			if not os.path.exists(self.p_mask):
+				os.makedirs(self.p_mask)
+			self.p_result = os.path.join(self.path, "saver", "result")
+			if not os.path.exists(self.p_result):
+				os.makedirs(self.p_result)
+
 		print "============ Ready ============"
 
 	def read_commodity(self, path):
@@ -172,6 +189,8 @@ class text_detection(object):
 		resp.mask = self.cv_bridge.cv2_to_imgmsg(mask, "8UC1")
 		vis_mask = np.zeros([cv_image.shape[0], cv_image.shape[1]], dtype = np.uint8)
 		vis_mask[mask != 0] = 255 - mask[mask != 0]
+		if self.saver:
+			self.save_func(img_list_0_90_180_270[0], mask, self.cv_bridge.imgmsg_to_cv2(resp.depth, "16UC1"), cv_image)
 		## srv end
 		self.predict_img_pub.publish(self.cv_bridge.cv2_to_imgmsg(cv_image, "bgr8"))
 		self.predict_mask_pub.publish(self.cv_bridge.cv2_to_imgmsg(vis_mask, "8UC1"))
@@ -237,7 +256,7 @@ class text_detection(object):
 				for j in range(len(contours)):
 					cnt = contours[j]
 					area = cv2.contourArea(cnt) 
-					if area > 3000:
+					if area > 1000:
 						cv2.drawContours(img, [cnt], -1, self.color_map[direct], 3)
 						x,y,w,h = cv2.boundingRect(cnt)
 						word = self.commodity_list[obj] + " " + str(direct*90)
@@ -277,6 +296,14 @@ class text_detection(object):
 		s = "True" if req.data else "False"
 		resp.result = "Switch turn to {}".format(req.data)
 		return resp
+
+	def save_func(self, img, mask, depth, result):
+		cv2.imwrite("{}/{}.png".format(self.p_img, self.saver_count), img)
+		cv2.imwrite("{}/{}.png".format(self.p_mask, self.saver_count), mask)
+		cv2.imwrite("{}/{}.png".format(self.p_depth, self.saver_count), depth)
+		cv2.imwrite("{}/{}.png".format(self.p_result, self.saver_count), result)
+
+		self.saver_count += 1
 
 	def onShutdown(self):
 		rospy.loginfo("Shutdown.")	

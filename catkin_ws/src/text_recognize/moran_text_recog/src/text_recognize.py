@@ -40,7 +40,7 @@ class text_recognize(object):
 
 		self.means = (0.485, 0.456, 0.406)
 		self.stds = (0.229, 0.224, 0.225)
-		self.bbox_thres = 3000
+		self.bbox_thres = 1500
 
 		self.color_map = [(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,255,255)] # 0 90 180 270 noise
 
@@ -186,24 +186,50 @@ class text_recognize(object):
 			# print('\nResult:\n' + 'Left to Right: ' + sim_preds + '\nRight to Left: ' + sim_preds_reverse + '\n\n')
 			end = time.time()
 			print "Text Recognize Time : {}".format(end - start)
+			_cont = []
+			for p in text_bb.contour:
+				point = []
+				point.append(p.point[0])
+				point.append(p.point[1])
+				_cont.append(point)
+			_cont = np.array(_cont, np.int32)
 			if sim_preds in self.commodity_list:
 				cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), self.color_map[rot], 3)
 				cv2.putText(img, sim_preds, (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 255, 255),3)
-				_cont = []
-				for p in text_bb.contour:
-					point = []
-					point.append(p.point[0])
-					point.append(p.point[1])
-					_cont.append(point)
-				_cont = np.array(_cont, np.int32)
 				cv2.fillConvexPoly(mask, _cont, self.commodity_list.index(sim_preds) + rot*len(self.commodity_list))
-
 			else:
-				cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (0, 0, 0), 2)
+				correct, conf, _bool = self.conf_of_word(sim_preds)
+				print conf
+				if _bool:
+					cv2.putText(img, correct + "{:.2f}".format(conf), (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 255, 255),3)
+					cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (255, 255, 255), 2)
+					cv2.fillConvexPoly(mask, _cont, self.commodity_list.index(correct) + rot*len(self.commodity_list))
+
+				# else:
+				# 	cv2.putText(img, sim_preds, (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 0, 0),3)
+				# 	cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (0, 0, 0), 2)					
 
 		return img, mask
 
+	def conf_of_word(self, target):
+		total = np.ones(len(self.commodity_list))
+		get = np.zeros(len(self.commodity_list))
+		for i in range(1, len(self.commodity_list)):
+			for word in self.commodity_list[i]:
+				if target.find(word) != -1:
+					get[i] += 1
+				else:
+					get[i] -= 1
+				total[i] += 1
+			for j in range(len(self.commodity_list[i])-1):
+				if target.find(self.commodity_list[i][j:j+2]) != -1:
+					get[i] += 3
+				total[i] += 3
 
+		total = get / total
+
+		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) > 0.4
+		# source, _conf, _bool
 	def onShutdown(self):
 		rospy.loginfo("Shutdown.")	
 	

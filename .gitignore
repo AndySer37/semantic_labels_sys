@@ -1,5 +1,6 @@
 *.png
 *.pth
 *.pyc
+*.jpg
 build/
 devel/
