@@ -184,8 +184,8 @@ class text_recognize(object):
 			sim_preds_reverse = sim_preds_reverse.strip().split('$')[0]
 
 			# print('\nResult:\n' + 'Left to Right: ' + sim_preds + '\nRight to Left: ' + sim_preds_reverse + '\n\n')
-			end = time.time()
-			print "Text Recognize Time : {}".format(end - start)
+			print "Text Recognize Time : {}".format(time.time() - start)
+
 			_cont = []
 			for p in text_bb.contour:
 				point = []
@@ -199,7 +199,8 @@ class text_recognize(object):
 				cv2.fillConvexPoly(mask, _cont, self.commodity_list.index(sim_preds) + rot*len(self.commodity_list))
 			else:
 				correct, conf, _bool = self.conf_of_word(sim_preds)
-				print conf
+
+				# print conf
 				if _bool:
 					cv2.putText(img, correct + "{:.2f}".format(conf), (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 255, 255),3)
 					cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (255, 255, 255), 2)
@@ -212,21 +213,57 @@ class text_recognize(object):
 		return img, mask
 
 	def conf_of_word(self, target):
-		total = np.ones(len(self.commodity_list))
-		get = np.zeros(len(self.commodity_list))
-		for i in range(1, len(self.commodity_list)):
-			for word in self.commodity_list[i]:
-				if target.find(word) != -1:
-					get[i] += 1
-				else:
-					get[i] -= 1
-				total[i] += 1
-			for j in range(len(self.commodity_list[i])-1):
-				if target.find(self.commodity_list[i][j:j+2]) != -1:
-					get[i] += 3
-				total[i] += 3
+		total = np.zeros(len(self.commodity_list))
 
-		total = get / total
+		for i in range(1, len(self.commodity_list)):
+
+			# if self.commodity_list[i] != "raisins":
+			# 	continue
+
+			err = 0  ## error 
+			_len = len(self.commodity_list[i])
+			arr = -10 * np.ones(_len)
+			for j in range(len(target)):
+				index = self.commodity_list[i].find(target[j])
+				if index == -1:
+					err += 1
+				else:
+					upper = arr[index+1] if index != _len - 1 else -10
+					if arr[index] == -10 and upper == -10:
+						arr[index] = j
+					else:
+						index = self.commodity_list[i].find(target[j], index + 1)
+						while index != -1:
+							lower = arr[index-1] if index != 0 else -10
+							upper = arr[index+1] if index != _len - 1 else -10
+							if (arr[index] - lower) == 1 or (upper - arr[index]) == 1:
+								index = self.commodity_list[i].find(target[j], index + 1)
+							else:
+								arr[index] = j
+								break
+
+			score = 0   # score for word 
+			for j in range(_len - 1):
+				if arr[j+1] - arr[j] == 1:
+					score += 1
+			total[i] = float(score) / (_len + err - 1)
+			# print score, _len, err, arr
+
+
+		# get = np.zeros(len(self.commodity_list))
+		# for i in range(1, len(self.commodity_list)):
+		# 	for word in self.commodity_list[i]:
+		# 		if target.find(word) != -1:
+		# 			get[i] += 1
+		# 		else:
+		# 			get[i] -= 1
+		# 		total[i] += 1
+		# 	for j in range(len(self.commodity_list[i])-1):
+		# 		if target.find(self.commodity_list[i][j:j+2]) != -1:
+		# 			get[i] += 3
+		# 		total[i] += 3
+
+		# total = get / total
 
 		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) > 0.4
 		# source, _conf, _bool
