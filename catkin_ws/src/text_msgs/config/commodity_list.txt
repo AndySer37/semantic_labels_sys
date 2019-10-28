@@ -6,3 +6,5 @@ dove
 3m
 andes
 milo
+vanish
+kleenex
