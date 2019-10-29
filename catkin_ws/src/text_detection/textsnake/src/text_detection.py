@@ -47,7 +47,7 @@ class text_detection(object):
 		self.means = (0.485, 0.456, 0.406)
 		self.stds = (0.229, 0.224, 0.225)
 
-		self.saver = True
+		self.saver = False
 
 		self.color_map = [(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,255,255)] # 0 90 180 270 noise
 
