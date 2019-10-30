@@ -10,4 +10,6 @@ git pull --recurse-submodules
 
 ### How to run the Brandname segmentation node
 
-''' roslaunch s '''
+''' 
+roslaunch s 
+'''
