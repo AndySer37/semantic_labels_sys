@@ -20,6 +20,6 @@ roslaunch semantic_system main.launch
 
 ### Object list
 
-***
+`
 catkin_ws/src/text_msgs/config/commodity_list.txt
-***
+`
