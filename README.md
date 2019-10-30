@@ -31,6 +31,11 @@ https://drive.google.com/open?id=1lXbArdtTTvwlO_NhkgohHtasmfBMCNmw
 ```
 roslaunch semantic_system main.launch
 ```
+Turn on the service
+
+```
+rosservice call /text_detection/predict_switch_server "data: true"
+```
 
 ### Object list
 
