@@ -3,6 +3,7 @@
 
 #include "../include/realsense_node_factory.h"
 #include "../include/base_realsense_node.h"
+#include "../include/t265_realsense_node.h"
 #include <iostream>
 #include <map>
 #include <mutex>
@@ -19,6 +20,7 @@ constexpr auto realsense_ros_camera_version = REALSENSE_ROS_EMBEDDED_VERSION_STR
 PLUGINLIB_EXPORT_CLASS(realsense2_camera::RealSenseNodeFactory, nodelet::Nodelet)
 
 rs2::device _device;
+std::mutex _device_mutex;
 
 RealSenseNodeFactory::RealSenseNodeFactory()
 {
@@ -106,6 +108,7 @@ rs2::device RealSenseNodeFactory::getDevice()
 
 void RealSenseNodeFactory::change_device_callback(rs2::event_information& info)
 {
+	std::lock_guard<std::mutex> guard(_device_mutex);
 	if (info.was_removed(_device))
 	{
 		ROS_ERROR("The device has been disconnected!");
@@ -139,6 +142,8 @@ void RealSenseNodeFactory::onInit()
 		ros::NodeHandle nh = getNodeHandle();
 		auto privateNh = getPrivateNodeHandle();
 		privateNh.param("serial_no", _serial_no, std::string(""));
+
+		std::lock_guard<std::mutex> guard(_device_mutex);
 
 		std::string rosbag_filename("");
 		privateNh.param("rosbag_filename", rosbag_filename, std::string(""));
@@ -203,8 +208,10 @@ void RealSenseNodeFactory::StartDevice()
 	case RS435_RGB_PID:
 	case RS435i_RGB_PID:
 	case RS_USB2_PID:
-	case RS_T265_PID:
 		_realSenseNode = std::unique_ptr<BaseRealSenseNode>(new BaseRealSenseNode(nh, privateNh, _device, _serial_no));
+		break;
+	case RS_T265_PID:
+		_realSenseNode = std::unique_ptr<T265RealsenseNode>(new T265RealsenseNode(nh, privateNh, _device, _serial_no));
 		break;
 	default:
 		ROS_FATAL_STREAM("Unsupported device!" << " Product ID: 0x" << pid_str);

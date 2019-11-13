@@ -38,3 +38,8 @@ add_dependencies(object_pose_node src/object_pose_node.cpp ${catkin_EXPORTED_TAR
 add_executable(bn_pose_node src/bn_pose_node.h src/bn_pose_node.cpp)
 target_link_libraries(bn_pose_node ${catkin_LIBRARIES})
 add_dependencies(bn_pose_node src/bn_pose_node.cpp ${catkin_EXPORTED_TARGETS})
+
+add_executable(mushroom_pose src/mushroom_pose.h src/mushroom_pose.cpp)
+target_link_libraries(mushroom_pose ${catkin_LIBRARIES})
+add_dependencies(mushroom_pose src/mushroom_pose.cpp ${catkin_EXPORTED_TARGETS})
+

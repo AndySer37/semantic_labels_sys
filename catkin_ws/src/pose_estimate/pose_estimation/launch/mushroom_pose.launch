@@ -1,0 +1,3 @@
+<launch>    
+    <node name="mushroom_pose" pkg="pose_estimation" type="mushroom_pose"  output="screen" required="true"></node>
+</launch>
