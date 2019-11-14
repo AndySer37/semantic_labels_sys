@@ -22,7 +22,7 @@ class gripper_control(object):
 
         rospy.loginfo("Close gripper!")
         msg = Robotiq2FGripper_robot_output()
-        msg.rACT = 1; msg.rGTO = 1; msg.rPR = 255; msg.rSP = 200; msg.rFR = 100;
+        msg.rACT = 1; msg.rGTO = 1; msg.rPR = 255; msg.rSP = 200; msg.rFR = 255
         self.gripper_pub.publish(msg)
         return EmptyResponse()
 

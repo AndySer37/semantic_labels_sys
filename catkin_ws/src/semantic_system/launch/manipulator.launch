@@ -8,7 +8,7 @@
 	<group unless="$(arg sim)">
 		<!-- UR5 driver -->
 		<include file="$(find arm_operation)/launch/ur5_real.launch">
-		    <arg name="robot_ip" default="192.168.50.11" />
+		    <arg name="robot_ip" default="192.168.1.9" />
 		    <arg name="tool_length" default="0.15"/>
 		</include>
 		<!-- robotiq 2-finger gripper -->

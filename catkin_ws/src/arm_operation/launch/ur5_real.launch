@@ -15,7 +15,7 @@
     <param name="wrist2_lower_bound" value="-3.14"/>
     <param name="wrist3_upper_bound" value="1.9"/>
     <param name="wrist3_lower_bound" value="-2.2"/>
-    <param name="force_thres" value="400.0"/> <!-- Disable the function -->
+    <param name="force_thres" value="1000.0"/> <!-- Disable the function -->
     <remap from="~joint_states" to="/joint_states"/>
   </node>
 </launch>

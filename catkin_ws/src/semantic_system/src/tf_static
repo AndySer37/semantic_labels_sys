@@ -1,0 +1,1 @@
+rosrun tf statransform_publisher 0.032378 -0.019758 0.082010 -0.007896 0.070971 -0.000365 0.997447  ee_link camera_link  100

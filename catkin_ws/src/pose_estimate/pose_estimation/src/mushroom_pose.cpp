@@ -41,7 +41,8 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	eigen_tf(1, 3) = transform.getOrigin().getY(); 
 	eigen_tf(2, 3) = transform.getOrigin().getZ(); 
 
-	pcl::transformPointCloud(*input, *input, eigen_tf);
+	// pcl::transformPointCloud(*input, *input, eigen_tf);
+
 	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
 	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, z_lower_bound)));
 	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, z_upper_bound)));
@@ -176,7 +177,19 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 			rot *= temp_y;
 		}
 
+		tf::Matrix3x3 x_90 = tf::Matrix3x3(1, 0, 0,
+											0, 0, -1,
+											0, 1, 0);
+		rot *= x_90;
+
+		tf::Matrix3x3 z_90 = tf::Matrix3x3(0, -1, 0,
+											1, 0, 0,
+											0, 0, 1);
+		rot *= z_90;
+
 		tf::Transform object_tf = tf::Transform(rot, tran);
+		object_tf = transform * object_tf;
+
 		text_msgs::object_pose ob_pose;
 		// geometry_msgs::Pose pose;
 		quaternionTFToMsg(object_tf.getRotation(), ob_pose.pose.orientation); 
@@ -216,7 +229,7 @@ object_pose_node::object_pose_node(){
 	cx = msg->P[2];
 	cy = msg->P[6];
 
-	target = "camera_color_optical_frame";  // base_link
+	target = "base_link";  // base_link
 	source = "camera_color_optical_frame";
 
 	input.reset(new PointCloud<PointXYZRGB>()); 
@@ -226,17 +239,17 @@ object_pose_node::object_pose_node(){
 
 	sor.setMeanK (10);
 	sor.setStddevMulThresh (0.8);
-	downsample.setLeafSize (0.015, 0.015, 0.015);
+	downsample.setLeafSize (0.001, 0.001, 0.001);
 
 	ec.setClusterTolerance (0.05); 
-	ec.setMinClusterSize (30);
+	ec.setMinClusterSize (400);
 	ec.setMaxClusterSize (20000);
 	ec.setSearchMethod (tree);
 
-	y_lower_bound = -0.05;
-	y_upper_bound = 0.0;
-	z_lower_bound = 0.3;
-	z_upper_bound = 1.0;
+	y_lower_bound = -0.06;
+	y_upper_bound = -0.01;
+	z_lower_bound = 0.2;
+	z_upper_bound = 0.45;
 
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2> ("pc", 10);
