@@ -1,6 +1,6 @@
-[submodule "catkin_ws/src/arm_operation	"]
-	path = catkin_ws/src/arm_operation	
-	url = https://github.com/sean85914/arm_operation
+#[submodule "catkin_ws/src/arm_operation	"]
+#	path = catkin_ws/src/arm_operation	
+#	url = https://github.com/sean85914/arm_operation
 [submodule "catkin_ws/src/in_hand_manipulator "]
         path = catkin_ws/src/in_hand_manipulator
         url = https://github.com/WolfNCTU/in_hand_manipulator

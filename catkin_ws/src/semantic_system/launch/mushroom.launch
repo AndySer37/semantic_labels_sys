@@ -14,6 +14,10 @@
 		<!-- robotiq 2-finger gripper -->
 		<node name="robotiq2FGripper" pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py"  args="/dev/ttyGripper" required="true"/>
 
+        <node name="pose_estimation" pkg="pose_estimation" type="mushroom_pose" required="true"/>
+        <node name="gripper_control" pkg="arm_control" type="gripper_control.py" required="true"/>
+        <node name="fsm_system" pkg="semantic_system" type="mushroom_system.py" required="true"/>
+
 	</group>
 
 </launch>

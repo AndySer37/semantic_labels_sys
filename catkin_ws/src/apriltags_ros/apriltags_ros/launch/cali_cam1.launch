@@ -16,8 +16,8 @@
 
     <!-- Describe the tags -->
     <rosparam param="tag_descriptions">[
-      {id: 0, size: 0.044},
-      {id: 1, size: 0.09}]
+      {id: 0, size: 0.18},
+      {id: 432, size: 0.064}]
     </rosparam>
   </node>
 </launch>
