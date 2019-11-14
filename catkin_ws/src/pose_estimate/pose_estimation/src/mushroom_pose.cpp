@@ -23,7 +23,7 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	tf::StampedTransform transform;
 	static tf::TransformListener listener;
 	try{
-		listener.waitForTransform(target, source, ros::Time(0), ros::Duration(0.5));
+		listener.waitForTransform(target, source, ros::Time(0), ros::Duration(2));
 		listener.lookupTransform(target, source, ros::Time(0), transform);
 	} catch(tf::TransformException &ex){
 		ROS_ERROR("%s",ex.what());

@@ -264,10 +264,14 @@ class FSM(object):
 
         rospy.wait_for_service('/object_pose_node')
         res_pose = object_onlyResponse()
+        # while True:
         try:
             pose_ser = rospy.ServiceProxy('/object_pose_node', object_only)
             req = object_onlyRequest()
             res_pose = pose_ser(req)
+            # if res_pose.ob_list[0].pose.position.x > 0.01 and res_pose.ob_list[0].pose.position.y > 0.01 and res_pose.ob_list[0].pose.position.z > 0.01:
+            #     break
+
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
 

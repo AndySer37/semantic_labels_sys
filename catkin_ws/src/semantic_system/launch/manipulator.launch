@@ -14,6 +14,8 @@
 		<!-- robotiq 2-finger gripper -->
 		<node name="robotiq2FGripper" pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py"  args="/dev/ttyGripper" required="true"/>
 
+		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.032378 -0.019758 0.082010 -0.007896 0.070971 -0.000365 0.997447  ee_link camera_link  100"/>
+
 	</group>
 
 </launch>
