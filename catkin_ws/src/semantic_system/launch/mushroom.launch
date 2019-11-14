@@ -16,7 +16,7 @@
 
         <node name="pose_estimation" pkg="pose_estimation" type="mushroom_pose" required="true"/>
         <node name="gripper_control" pkg="arm_control" type="gripper_control.py" required="true"/>
-        <node name="fsm_system" pkg="semantic_system" type="mushroom_system.py" required="true"/>
+        <node name="fsm_system" pkg="semantic_system" type="mushroom_system.py" required="true" output="screen"/>
 
 	</group>
 

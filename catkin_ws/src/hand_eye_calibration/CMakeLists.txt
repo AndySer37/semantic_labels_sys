@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   message_filters
   arm_operation
-  visual_system
+  #visual_system
 )
 
 find_package(Boost REQUIRED)
@@ -79,8 +79,8 @@ target_link_libraries(mat_quat_conversion ${catkin_LIBRARIES})
 add_executable(cameras_calibration src/cameras_calibration.cpp)
 target_link_libraries(cameras_calibration ${catkin_LIBRARIES})
 
-add_executable(validate_charuco_data src/validate_charuco_data.cpp)
-target_link_libraries(validate_charuco_data ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} charuco_detector)
+#add_executable(validate_charuco_data src/validate_charuco_data.cpp)
+#target_link_libraries(validate_charuco_data ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} charuco_detector)
 
 install(TARGETS mat_quat_conversion 
   RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin

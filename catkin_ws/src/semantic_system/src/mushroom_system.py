@@ -57,10 +57,10 @@ class FSM(object):
         try:
             ur5_joint_ser = rospy.ServiceProxy('/ur5_control_server/ur_control/goto_joint_pose', joint_pose)
             req = joint_poseRequest()
-            # msg = joint_value()
+            msg = joint_value()
             for i in range(6):
-                req.joint[i] = JOINTS_PICKING_HOME[i]
-            # req.joints.append(msg)
+                msg[i] = JOINTS_PICKING_HOME[i]
+            req.joints.append(msg)
             resp1 = ur5_joint_ser(req)
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
