@@ -67,7 +67,7 @@ class object_pose_node{
     PointCloud<PointXYZRGB>::Ptr output;
     string target, source;
     float fx, fy, cx, cy;
-    float z_upper_bound, z_lower_bound;
+    float y_lower_bound, y_upper_bound, z_upper_bound, z_lower_bound;
 
     VoxelGrid<PointXYZRGB> downsample;
     StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;

@@ -120,13 +120,13 @@ void MainWindow::compute(void) {
             tf::Quaternion quat(qx, qy, qz, qw);
             tf::Matrix3x3 rot_mat(quat);
             ui->xx_input->setValue(rot_mat[0][0]); xx = rot_mat[0][0];
-            ui->xy_input->setValue(rot_mat[0][1]); xy = rot_mat[0][1];
-            ui->xz_input->setValue(rot_mat[0][2]); xz = rot_mat[0][2];
-            ui->yx_input->setValue(rot_mat[1][0]); yx = rot_mat[1][0];
+            ui->xy_input->setValue(rot_mat[1][0]); xy = rot_mat[0][1];
+            ui->xz_input->setValue(rot_mat[2][0]); xz = rot_mat[0][2];
+            ui->yx_input->setValue(rot_mat[0][1]); yx = rot_mat[1][0];
             ui->yy_input->setValue(rot_mat[1][1]); yy = rot_mat[1][1];
-            ui->yz_input->setValue(rot_mat[1][2]); yz = rot_mat[1][2];
-            ui->zx_input->setValue(rot_mat[2][0]); zx = rot_mat[2][0];
-            ui->zy_input->setValue(rot_mat[2][1]); zy = rot_mat[2][1];
+            ui->yz_input->setValue(rot_mat[2][1]); yz = rot_mat[1][2];
+            ui->zx_input->setValue(rot_mat[0][2]); zx = rot_mat[2][0];
+            ui->zy_input->setValue(rot_mat[1][2]); zy = rot_mat[2][1];
             ui->zz_input->setValue(rot_mat[2][2]); zz = rot_mat[2][2];
             ui->status->setText("Completed!");
         }

@@ -45,8 +45,8 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
 	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, z_lower_bound)));
 	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, z_upper_bound)));
-	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::GT, -0.05)));
-	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::LT, 0)));
+	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::GT, y_lower_bound)));
+	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::LT, y_upper_bound)));
 
 	pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem;
 	condrem.setCondition(range_cond);
@@ -163,9 +163,20 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		tf::Matrix3x3 rot = tf::Matrix3x3(rotational_matrix_OBB(0,0), rotational_matrix_OBB(0,1), rotational_matrix_OBB(0,2),
 												rotational_matrix_OBB(1,0), rotational_matrix_OBB(1,1), rotational_matrix_OBB(1,2),
 												rotational_matrix_OBB(2,0), rotational_matrix_OBB(2,1), rotational_matrix_OBB(2,2));
+		if (rot[2][2] < 0){
+			tf::Matrix3x3 temp_z = tf::Matrix3x3(-1, 0, 0,
+												0, 1, 0,
+												0, 0, -1);
+			rot *= temp_z;
+		}
+		if (rot[1][1] < 0){
+			tf::Matrix3x3 temp_y = tf::Matrix3x3(-1, 0, 0,
+												0, -1, 0,
+												0, 0, 1);
+			rot *= temp_y;
+		}
 
 		tf::Transform object_tf = tf::Transform(rot, tran);
-
 		text_msgs::object_pose ob_pose;
 		// geometry_msgs::Pose pose;
 		quaternionTFToMsg(object_tf.getRotation(), ob_pose.pose.orientation); 
@@ -222,8 +233,11 @@ object_pose_node::object_pose_node(){
 	ec.setMaxClusterSize (20000);
 	ec.setSearchMethod (tree);
 
+	y_lower_bound = -0.05;
+	y_upper_bound = 0.0;
 	z_lower_bound = 0.3;
 	z_upper_bound = 1.0;
+
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2> ("pc", 10);
 

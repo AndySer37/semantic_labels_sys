@@ -24,6 +24,18 @@ inline Eigen::Matrix4f tf2eigen(const tf::Transform t){
          0.0f, 0.0f, 0.0f, 1.0f;
   return res;
 }
+
+inline tf::Transform eigen2tf(const Eigen::Matrix4f mat){
+  tf::Matrix3x3 rot_mat(mat(0, 0), mat(0, 1), mat(0, 2),
+                        mat(1, 0), mat(1, 1), mat(1, 2),
+                        mat(2, 0), mat(2, 1), mat(2, 2));
+  tf::Vector3 origin(mat(0, 3), mat(1, 3), mat(2, 3));
+  tf::Transform res;
+  res.setBasis(rot_mat);
+  res.setOrigin(origin);
+  return res;
+}
+
 inline void print_tf(const tf::Transform t){
   std::cout << std::setw(10) \
 << t.getBasis()[0].getX() << ", " << t.getBasis()[0].getY() << ", " << t.getBasis()[0].getZ() << ", " << t.getOrigin().getX() << "\n" \
@@ -93,12 +105,29 @@ class calibration{
                              rot_mat_X(1, 0), rot_mat_X(1, 1), rot_mat_X(1, 2),
                              rot_mat_X(2, 0), rot_mat_X(2, 1), rot_mat_X(2, 2));
     tf::Quaternion quat; rot_mat_tf.getRotation(quat);
+    tf::Transform res_transform;
+    res_transform.setOrigin(tf::Vector3(trans_X(0, 0), trans_X(1, 0), trans_X(2, 0)));
+    res_transform.setBasis(rot_mat_tf);
     double r, p, y;
     rot_mat_tf.getRPY(r, p, y);
     ROS_INFO("Translation: %f %f %f", trans_X(0, 0), trans_X(1, 0), trans_X(2, 0));
     ROS_INFO("Orientation(Quaternion): %f %f %f %f", quat.getX(), quat.getY(), quat.getZ(), quat.getW());
     ROS_INFO("Orientation(Euler): %f %f %f", r, p, y);
     computed = true;
+    double error = 0.0f;
+    // Compute error
+    for(int i=0; i<A_vec.size(); ++i){
+      tf::Transform AX = eigen2tf(A_vec[i])*res_transform,
+                    XB = res_transform*eigen2tf(B_vec[i]);
+      auto AX_position = AX.getOrigin();
+      auto XB_position = XB.getOrigin();
+      double dx = AX_position.getX() - XB_position.getX(),
+             dy = AX_position.getY() - XB_position.getY(),
+             dz = AX_position.getZ() - XB_position.getZ(),
+      error = error + (dx*dx+dy*dy+dz*dz);
+    }
+    error /= A_vec.size();
+    ROS_INFO("Error: %f (mm)", sqrt(error)*1000);
     return;
   }
   void write_file(void){
