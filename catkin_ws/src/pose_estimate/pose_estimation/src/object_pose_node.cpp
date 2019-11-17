@@ -41,7 +41,9 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	eigen_tf(1, 3) = transform.getOrigin().getY(); 
 	eigen_tf(2, 3) = transform.getOrigin().getZ(); 
 
+	// Transfrom from camera to base
 	pcl::transformPointCloud(*input, *input, eigen_tf);
+
 	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
 	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, lower_bound)));
 	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, upper_bound)));
@@ -181,7 +183,7 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 
 	sensor_msgs::PointCloud2 object_cloud_msg;
 	toROSMsg(*output, object_cloud_msg);
-	object_cloud_msg.header.frame_id = "camera_link";
+	object_cloud_msg.header.frame_id = "camera_color_optical_frame";
 	pub_pc_process.publish(object_cloud_msg);
 
 	markerPub.publish(markerArray);
@@ -202,8 +204,8 @@ object_pose_node::object_pose_node(){
 	cx = msg->P[2];
 	cy = msg->P[6];
 
-	target = "camera_link";  // base_link
-	source = "camera_link";
+	target = "base_link";  // base_link
+	source = "camera_color_optical_frame";
 
 	input.reset(new PointCloud<PointXYZRGB>()); 
 	output.reset(new PointCloud<PointXYZRGB>());
@@ -212,11 +214,11 @@ object_pose_node::object_pose_node(){
 
 	sor.setMeanK (10);
 	sor.setStddevMulThresh (0.8);
-	downsample.setLeafSize (0.015, 0.015, 0.015);
+	downsample.setLeafSize (0.001, 0.001, 0.001);
 
 	ec.setClusterTolerance (0.05); 
-	ec.setMinClusterSize (30);
-	ec.setMaxClusterSize (1000);
+	ec.setMinClusterSize (300);
+	ec.setMaxClusterSize (40000);
 	ec.setSearchMethod (tree);
 
 	lower_bound = 0.0;
