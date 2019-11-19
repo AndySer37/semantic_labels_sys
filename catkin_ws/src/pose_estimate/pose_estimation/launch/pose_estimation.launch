@@ -1,3 +1,5 @@
+<?xml version="1.0" ?>
+
 <launch>    
     <node name="depth_to_pose" pkg="pose_estimation" type="depth_to_pose.py"  output="screen" required="true"></node>
     <node name="bn_pose_node" pkg="pose_estimation" type="bn_pose_node"  output="screen" required="true"></node>

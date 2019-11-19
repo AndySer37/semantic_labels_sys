@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
-	<arg name="sim" default="true" />
+	<arg name="sim" default="false" />
 
 	<group if="$(arg sim)">
 
@@ -8,14 +8,15 @@
 	<group unless="$(arg sim)">
 		<!-- UR5 driver -->
 		<include file="$(find arm_operation)/launch/ur5_real.launch">
-		    <arg name="robot_ip" default="192.168.1.9" />
+		    <arg name="robot_ip" default="192.168.50.11" />
 		    <arg name="tool_length" default="0.15"/>
 		</include>
 		<!-- robotiq 2-finger gripper -->
 		<node name="robotiq2FGripper" pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py"  args="/dev/ttyGripper" required="true"/>
 
-		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.032378 -0.019758 0.082010 -0.007896 0.070971 -0.000365 0.997447  ee_link camera_link  100"/>
+		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.042378 -0.019758 0.082010 -0.007896 0.080971 0.01365 0.997447  ee_link camera_link  100"/>
 
+		<node name="gripper_control" pkg="arm_control" type="gripper_control.py" required="true"/>
 	</group>
 
 </launch>

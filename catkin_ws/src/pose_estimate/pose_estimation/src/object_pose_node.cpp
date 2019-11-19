@@ -8,6 +8,8 @@ void object_pose_node::getXYZ(float* a, float* b,float zc){
 	*b = (*b - cy) * zc * inv_fy;
 	return;
 }
+
+// 5.962156, -1.6593626, 1.385752, -1.284763, -1.4621570, 0.133269459
 bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs::object_only::Response &res){
 	res.count = 0;
 
@@ -33,7 +35,7 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	Eigen::Matrix4f eigen_tf = Eigen::Matrix4f::Identity();
 	tf::Matrix3x3 rotation(transform.getRotation());
 	for (int i = 0; i < 3; i++){
-		for (int j = 1; j < 3; j++){
+		for (int j = 0; j < 3; j++){
 			eigen_tf(i, j) = rotation[i][j];
 		}
 	}
@@ -44,6 +46,7 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	// Transfrom from camera to base
 	pcl::transformPointCloud(*input, *input, eigen_tf);
 
+
 	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
 	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, lower_bound)));
 	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, upper_bound)));
@@ -53,8 +56,15 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	condrem.filter(*process);
 
 	// downsample the pc
+
 	downsample.setInputCloud (process);
 	downsample.filter (*process);
+
+	sensor_msgs::PointCloud2 object_cloud_msg;
+	toROSMsg(*process, object_cloud_msg);
+	object_cloud_msg.header.frame_id = "base_link";
+	pub_pc_process.publish(object_cloud_msg);
+
 	// outlier removal
 	sor.setInputCloud(process);
 	sor.filter(*process);
@@ -74,7 +84,7 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		//// Visual bbox
 		visualization_msgs::Marker marker;
 		geometry_msgs::Point p1,p2,p3,p4,p5,p6,p7,p8;
-		marker.header.frame_id = "/camera_link";
+		marker.header.frame_id = "/base_link";
 		marker.header.stamp = ros::Time::now();
 		marker.ns = "lines";
 		marker.id = count;
@@ -135,6 +145,8 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		p8.y = h(1);
 		p8.z = h(2);
 
+
+
 		marker.points.push_back(p1);
 		marker.points.push_back(p2);
 		marker.points.push_back(p3);
@@ -163,6 +175,35 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 												rotational_matrix_OBB(1,0), rotational_matrix_OBB(1,1), rotational_matrix_OBB(1,2),
 												rotational_matrix_OBB(2,0), rotational_matrix_OBB(2,1), rotational_matrix_OBB(2,2));
 
+		if (rot[2][2] > 0){
+			tf::Matrix3x3 temp_z = tf::Matrix3x3(-1, 0, 0,
+												0, 1, 0,
+												0, 0, -1);
+			rot *= temp_z;
+		}
+		// if (rot[1][1] < 0){
+		// 	tf::Matrix3x3 temp_y = tf::Matrix3x3(-1, 0, 0,
+		// 										0, -1, 0,
+		// 										0, 0, 1);
+		// 	rot *= temp_y;
+		// }
+
+
+		tf::Matrix3x3 y_270 = tf::Matrix3x3(0, 0, -1,
+											0, 1, 0,
+											1, 0, 0);
+		rot *= y_270;
+
+		tf::Matrix3x3 x_180 = tf::Matrix3x3(1, 0, 0,
+											0, -1, 0,
+											0, 0, -1);
+		rot *= x_180;
+
+		// tf::Matrix3x3 z_90 = tf::Matrix3x3(0, -1, 0,
+		// 									1, 0, 0,
+		// 									0, 0, 1);
+		// rot *= z_90;
+
 		tf::Transform object_tf = tf::Transform(rot, tran);
 
 		text_msgs::object_pose ob_pose;
@@ -181,10 +222,10 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	} 
 	int num_cluster = cluster_indices.size();
 
-	sensor_msgs::PointCloud2 object_cloud_msg;
-	toROSMsg(*output, object_cloud_msg);
-	object_cloud_msg.header.frame_id = "camera_color_optical_frame";
-	pub_pc_process.publish(object_cloud_msg);
+	// sensor_msgs::PointCloud2 object_cloud_msg;
+	// toROSMsg(*output, object_cloud_msg);
+	// object_cloud_msg.header.frame_id = "base_link";
+	// pub_pc_process.publish(object_cloud_msg);
 
 	markerPub.publish(markerArray);
 
@@ -214,14 +255,14 @@ object_pose_node::object_pose_node(){
 
 	sor.setMeanK (10);
 	sor.setStddevMulThresh (0.8);
-	downsample.setLeafSize (0.001, 0.001, 0.001);
+	downsample.setLeafSize (0.005, 0.005, 0.005);
 
 	ec.setClusterTolerance (0.05); 
-	ec.setMinClusterSize (300);
-	ec.setMaxClusterSize (40000);
+	ec.setMinClusterSize (200);
+	ec.setMaxClusterSize (2000);
 	ec.setSearchMethod (tree);
 
-	lower_bound = 0.0;
+	lower_bound = 0.025;
 	upper_bound = 0.3;
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2> ("pc", 10);
