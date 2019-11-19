@@ -1,4 +1,9 @@
 *.png
+*.jpg
+*.mat
+*.xml
+*.pdf
+*.csv
 *.pth
 *.pyc
 *.jpg
