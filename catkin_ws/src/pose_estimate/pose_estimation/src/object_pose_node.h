@@ -68,6 +68,7 @@ class object_pose_node{
     string target, source;
     float fx, fy, cx, cy;
     float upper_bound, lower_bound;
+    float z_range;
 
     VoxelGrid<PointXYZRGB> downsample;
     StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;

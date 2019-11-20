@@ -8,7 +8,10 @@ from text_msgs.srv import *
 from text_msgs.msg import *
 
 Detect_SRV = "/text_detection/text_detection"
-Pose_SRV = "/depth_to_pose/get_pose"
+# Pose_SRV = "/depth_to_pose/get_pose"
+Object_Pose_SRV = "/object_pose_node"
+Brand_name_Pose_SRV = "/bn_pose_node"
+
 mani_req = manipulationRequest()
 
 class Perception(smach.State):

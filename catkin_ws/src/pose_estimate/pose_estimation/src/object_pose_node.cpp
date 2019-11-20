@@ -47,13 +47,26 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	pcl::transformPointCloud(*input, *input, eigen_tf);
 
 
-	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
-	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, lower_bound)));
-	range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, upper_bound)));
-	pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem;
-	condrem.setCondition(range_cond);
-	condrem.setInputCloud(input);
-	condrem.filter(*process);
+	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond1 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
+	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, lower_bound)));
+	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, upper_bound)));
+	pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem1;
+	condrem1.setCondition(range_cond1);
+	condrem1.setInputCloud(input);
+	condrem1.filter(*process);
+
+	pcl::PointXYZRGB minPt, maxPt;
+	pcl::getMinMax3D (*process, minPt, maxPt);
+	std::cout << "Max z: " << maxPt.z << std::endl;
+
+	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond2 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
+	range_cond2->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, maxPt.z - z_range)));
+	range_cond2->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, maxPt.z + z_range)));
+	pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem2;
+	condrem2.setCondition(range_cond2);
+	condrem2.setInputCloud(process);
+	condrem2.filter(*process);
+
 
 	// downsample the pc
 
@@ -255,15 +268,16 @@ object_pose_node::object_pose_node(){
 
 	sor.setMeanK (10);
 	sor.setStddevMulThresh (0.8);
-	downsample.setLeafSize (0.005, 0.005, 0.005);
+	downsample.setLeafSize (0.002, 0.002, 0.002);
 
 	ec.setClusterTolerance (0.05); 
 	ec.setMinClusterSize (200);
-	ec.setMaxClusterSize (2000);
+	ec.setMaxClusterSize (30000);
 	ec.setSearchMethod (tree);
 
 	lower_bound = 0.025;
-	upper_bound = 0.3;
+	upper_bound = 0.16;
+	z_range = 0.03;
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2> ("pc", 10);
 
