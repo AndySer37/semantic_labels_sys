@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import numpy as np
 
 import roslib
 import rospy
@@ -6,7 +7,9 @@ import smach
 import smach_ros
 from text_msgs.srv import *
 from text_msgs.msg import *
-from std_srvs.srv import Trigger, TriggerResponse, Empty
+from std_srvs.srv import Trigger, TriggerResponse, Empty, EmptyResponse, EmptyRequest
+import rospkg
+from cv_bridge import CvBridge, CvBridgeError
 
 Initial_gripper = '/gripper_control/initial'
 Detect_SRV = "/text_detection/text_detection"
@@ -16,47 +19,146 @@ Brand_name_Pose_SRV = "/bn_pose_node"
 
 Initial = 0
 Perception_bn = 1
-pick_bn = 2
-Perception_obj = 3
-pick_obj = 4
-flip = 5
+pose_bn = 2
+pick_bn = 3
+Perception_obj = 4
+pick_obj = 5
+flip = 6
 
-
+STOP = -99
+ERROR = -999
 
 
 
 class FSM():
     def __init__(self):
-        self.state = -99
+        r = rospkg.RosPack()
+        self.commodity_list = []
+        self.read_commodity(r.get_path('text_msgs') + "/config/commodity_list.txt")
+
+        self.last_state = STOP
+        self.state = STOP
+        self.last_img = 0
+        self.last_depth = 0
+        self.last_mask = 0
+        self.last_count = 0
+        self.last_list = []
+        self.cv_bridge = CvBridge()
         self.mani_req = manipulationRequest()
         self.start = rospy.Service("~start", Trigger, self.srv_start)
 
+    def read_commodity(self, path):
+
+        for line in open(path, "r"):
+            line = line.rstrip('\n')
+            self.commodity_list.append(line)
+        print "Node (FSM): Finish reading list"
+
+    def initial(self):
+
+        self.last_img = 0
+        self.last_depth = 0
+        self.last_mask = 0
+        self.last_count = 0
+        self.last_list = []
+
     def srv_start(self, req):
-        self.state = 0
+
+        self.state = Initial
         return TriggerResponse(success=True, message="Request accepted.")
+
     def process(self):
-        if self.state == 0:
+        if self.state == Initial:
             rospy.wait_for_service(Initial_gripper)
             try:
-                gripper_close_ser = rospy.ServiceProxy(Initial_gripper, Empty)
+                gripper_initial_ser = rospy.ServiceProxy(Initial_gripper, Empty)
                 req = EmptyRequest()
-                resp1 = gripper_close_ser(req)
+                resp1 = gripper_initial_ser(req)
             except rospy.ServiceException, e:
                 print "Service call failed: %s"%e
+            self.initial()
+            self.state = Perception_bn
+            return 
 
-            self.state = 1
-
-        if self.state == 1:
+        if self.state == Perception_bn:
             rospy.wait_for_service(Detect_SRV)
             try:
-                gripper_close_ser = rospy.ServiceProxy(Detect_SRV, text_detection_srv)
-                req = EmptyRequest()
-                resp1 = gripper_close_ser(req)
+                perception_bn_ser = rospy.ServiceProxy(Detect_SRV, text_detection_srv)
+                req = text_detection_srvRequest()
+                resp1 = perception_bn_ser(req)
+                self.last_img = resp1.image
+                self.last_depth = resp1.depth
+                self.last_mask = resp1.mask
             except rospy.ServiceException, e:
                 print "Service call failed: %s"%e 
-            
-            print  np.unique(self.cv_bridge.imgmsg_to_cv2(resp1.mask, "8UC1"))
-            
+
+            upward_list = np.unique(self.cv_bridge.imgmsg_to_cv2(self.last_mask, "8UC1"))
+            print "Brandname result: ", upward_list
+            if len(upward_list) == 1:
+                self.state = Perception_obj
+                self.last_count = 0
+                self.last_list = []
+            else:
+                self.state = pose_bn
+                self.last_count = len(upward_list) - 1
+                self.last_list = upward_list
+            return 
+
+        if self.state == Perception_obj:  
+            object_req = object_onlyRequest()
+            try:
+                rospy.wait_for_service(Object_Pose_SRV, timeout=10)
+                object_req.image = self.last_img
+                object_req.depth = self.last_depth
+                object_pose_srv = rospy.ServiceProxy(Object_Pose_SRV, object_only)
+                recog_resp = object_pose_srv(object_req)
+
+                print "Object num: ", recog_resp.count
+                if recog_resp.count == 0:
+                    self.state = STOP
+                else:
+                    self.mani_req.mode = "Object"
+                    self.mani_req.object = "Non_known"
+                    self.mani_req.pose = recog_resp.ob_list[0].pose
+                    print self.mani_req.pose
+                    self.state = STOP
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+            return 
+
+        if self.state == pose_bn:  
+            bn_req = bn_pose_srvRequest()
+            bn_req.count = self.last_count
+            for i in self.last_list:
+                if i != 0:
+                    bn_req.list.append(i)
+            try:
+                print bn_req.list
+                rospy.wait_for_service(Brand_name_Pose_SRV, timeout=10)
+                bn_req.total_list = len(self.commodity_list)
+                bn_req.image = self.last_img
+                bn_req.depth = self.last_depth
+                bn_req.mask = self.last_mask
+                bn_pose_est_srv = rospy.ServiceProxy(Brand_name_Pose_SRV, bn_pose_srv)
+                recog_resp = bn_pose_est_srv(bn_req)
+
+                if recog_resp.count == 0:
+                    self.state = ERROR
+                else:
+                    direct = recog_resp.ob_list[0].object / len(self.commodity_list)
+                    obj_name = self.commodity_list[recog_resp.ob_list[0].object % len(self.commodity_list)]
+                    self.mani_req.mode = "BN"
+                    self.mani_req.object = obj_name
+                    self.mani_req.pose = recog_resp.ob_list[0].pose
+                    print self.mani_req.pose
+                    print "Picking object ", obj_name
+                    print "Direction ", str(direct*90)
+                    self.state = STOP
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+            return 
+
+
     def shutdown_cb(self):
         rospy.loginfo("Node shutdown")
 
@@ -66,6 +168,6 @@ if __name__ == '__main__':
     rospy.on_shutdown(foo.shutdown_cb)
     while not rospy.is_shutdown():
         foo.process()
-        rospy.sleep(1)
+        rospy.sleep(2)
 
     rospy.spin()

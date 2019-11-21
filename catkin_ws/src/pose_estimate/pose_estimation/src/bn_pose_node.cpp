@@ -31,7 +31,7 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 	Eigen::Matrix4f eigen_tf = Eigen::Matrix4f::Identity();
 	tf::Matrix3x3 rotation(transform.getRotation());
 	for (int i = 0; i < 3; i++){
-		for (int j = 1; j < 3; j++){
+		for (int j = 0; j < 3; j++){
 			eigen_tf(i, j) = rotation[i][j];
 		}
 	}
@@ -85,7 +85,7 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 		//// Visual bbox
 		visualization_msgs::Marker marker;
 		geometry_msgs::Point p1,p2,p3,p4,p5,p6,p7,p8;
-		marker.header.frame_id = "/camera_link";
+		marker.header.frame_id = "/base_link";
 		marker.header.stamp = ros::Time::now();
 		marker.ns = "lines";
 		marker.id = count;
@@ -164,7 +164,6 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 		marker.points.push_back(p4);	
 		marker.lifetime = ros::Duration(10);
 		markerArray.markers.push_back(marker); 
-		cout << rotational_matrix_OBB << endl;
 
 		//// Visual bbox end ////
 
@@ -174,11 +173,56 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 												rotational_matrix_OBB(1,0), rotational_matrix_OBB(1,1), rotational_matrix_OBB(1,2),
 												rotational_matrix_OBB(2,0), rotational_matrix_OBB(2,1), rotational_matrix_OBB(2,2));
 
+		int direction = req.list[cls] / req.total_list;
+		cout << "Direction " << direction*90 << endl;
+
+		if (rot[2][2] > 0){
+			tf::Matrix3x3 temp_z = tf::Matrix3x3(-1, 0, 0,
+												0, 1, 0,
+												0, 0, -1);
+			rot *= temp_z;
+		}
+
+		tf::Matrix3x3 x_90 = tf::Matrix3x3(1, 0, 0,
+											0, 0, -1,
+											0, 1, 0);
+		rot *= x_90;
+
+		tf::Matrix3x3 z_90 = tf::Matrix3x3(0, -1, 0,
+											1, 0, 0,
+											0, 0, 1);
+		rot *= z_90;
+
+		tf::Matrix3x3 x_180 = tf::Matrix3x3(1, 0, 0,
+											0, -1, 0,
+											0, 0, -1);
+
+		if (direction == 0 && rot[1][1] < 0){
+			rot *= x_180;
+		}
+		if (direction == 1 && rot[1][2] > 0){
+			rot *= x_180;
+		}
+		if (direction == 2 && rot[1][1] > 0){
+			rot *= x_180;
+		}
+		if (direction == 3 && rot[1][2] < 0){
+			rot *= x_180;
+		}
+
+		for(int a = 0;a < 3; a++){
+			for(int b = 0;b < 3; b++){
+				cout << rot[a][b] << " " ;
+			}
+			cout << endl;
+		}
+
 		tf::Transform object_tf = tf::Transform(rot, tran);
 
 		text_msgs::object_pose ob_pose;
 		// geometry_msgs::Pose pose;
 		quaternionTFToMsg(object_tf.getRotation(), ob_pose.pose.orientation); 
+		ob_pose.object = req.list[cls];
 		tf::Vector3 pose_trans =  object_tf.getOrigin();
 		ob_pose.pose.position.x = pose_trans.getX();
 		ob_pose.pose.position.y = pose_trans.getY();
@@ -187,15 +231,15 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 
 		res.count += 1;
 		/////////////////////////////////////
-		br.sendTransform(tf::StampedTransform(object_tf, ros::Time::now(), source, "object" + std::to_string(count)));
+		br.sendTransform(tf::StampedTransform(object_tf, ros::Time::now(), target, "object" + std::to_string(count)));
 		*output += *process;
+		cout << process->points.size() << endl;
 		
 	}
-	cout << output->points.size() << endl;
 
 	sensor_msgs::PointCloud2 object_cloud_msg;
 	toROSMsg(*output, object_cloud_msg);
-	object_cloud_msg.header.frame_id = "camera_color_optical_frame";
+	object_cloud_msg.header.frame_id = "base_link";
 	pub_pc_process.publish(object_cloud_msg);
 
 	markerPub.publish(markerArray);
@@ -217,7 +261,7 @@ bn_pose_node::bn_pose_node(){
 	cy = msg->P[6];
 
 	target = "base_link";  // base_link
-	source = "camera_color_optical_frame";
+	source = "camera_color_frame";
 
 	input.reset(new PointCloud<PointXYZRGB>()); 
 	output.reset(new PointCloud<PointXYZRGB>());
@@ -225,7 +269,7 @@ bn_pose_node::bn_pose_node(){
 
 	sor.setMeanK (10);
 	sor.setStddevMulThresh (0.8);
-	downsample.setLeafSize (0.01, 0.01, 0.01);
+	downsample.setLeafSize (0.005, 0.005, 0.005);
 
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2> ("pc", 10);

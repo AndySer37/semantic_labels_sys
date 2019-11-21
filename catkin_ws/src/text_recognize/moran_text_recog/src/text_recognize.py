@@ -94,7 +94,7 @@ class text_recognize(object):
 		for line in open(path, "r"):
 			line = line.rstrip('\n')
 			self.commodity_list.append(line)
-		print "Finish reading list"
+		print "Node (text_recognize): Finish reading list"
 
 	def callback(self, msg):
 		try:

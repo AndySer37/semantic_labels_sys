@@ -101,7 +101,7 @@ class text_detection(object):
 		for line in open(path, "r"):
 			line = line.rstrip('\n')
 			self.commodity_list.append(line)
-		print "Finish reading list"
+		print "Node (text_detection): Finish reading list"
 
 	def srv_callback(self, req):
 		text_array = text_detection_array()
@@ -149,6 +149,7 @@ class text_detection(object):
 			# self.text_detection_pub.publish(text_array)
 			
 			recog_req = text_recognize_srvRequest()
+			recog_resp = text_recognize_srvResponse()
 			try:
 				rospy.wait_for_service(RECOG_SRV, timeout=10)
 				recog_req.data = text_array
