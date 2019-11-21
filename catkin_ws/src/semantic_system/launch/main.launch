@@ -1,5 +1,7 @@
 <?xml version="1.0" ?>
 <launch>
   <include file="$(find semantic_system)/launch/text_prediction.launch"></include>
-  <include file="$(find realsense2_camera)/launch/rs_rgbd.launch"></include>   
+  <!-- <include file="$(find realsense2_camera)/launch/rs_rgbd.launch"></include>    -->
+  <include file="$(find pose_estimation)/launch/pose_estimation.launch"></include>   
+  
 </launch>
