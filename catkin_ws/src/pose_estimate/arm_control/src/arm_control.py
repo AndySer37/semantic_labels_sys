@@ -21,14 +21,20 @@ class arm_control(object):
     def __init__(self):
         self.mani_req = manipulationRequest()
 
-        self.arm_move_srv = rospy.Service("~move_to", Trigger, self.srv_callback)
+        self.arm_move_srv = rospy.Service("~move_to", manipulation, self.srv_move)
         self.arm_home_srv = rospy.Service("~home", Trigger, self.srv_home)
 
-    def srv_callback(self, req):
+    def srv_move(self, req_mani):
 
-        print pose_res.count 
-        rospy.loginfo("No object. Finish the task")
-        return "finish"
+        rospy.wait_for_service('/ur5_control_server/ur_control/goto_pose')
+        try:
+            ur5_pose_ser = rospy.ServiceProxy('/ur5_control_server/ur_control/goto_pose', target_pose)
+            req = target_poseRequest()
+            req.target_pose = req_mani.pose
+            req.factor = 0.5
+            resp1 = ur5_pose_ser(req)
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e
 
     def srv_home(self, req):
 

@@ -178,8 +178,6 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		marker.points.push_back(p4);	
 		marker.lifetime = ros::Duration(10);
 		markerArray.markers.push_back(marker); 
-		cout << rotational_matrix_OBB << endl;
-
 		//// Visual bbox end ////
 
 		//// Publish tf and return pose
@@ -194,12 +192,6 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 												0, 0, -1);
 			rot *= temp_z;
 		}
-		// if (rot[1][1] < 0){
-		// 	tf::Matrix3x3 temp_y = tf::Matrix3x3(-1, 0, 0,
-		// 										0, -1, 0,
-		// 										0, 0, 1);
-		// 	rot *= temp_y;
-		// }
 
 
 		tf::Matrix3x3 y_270 = tf::Matrix3x3(0, 0, -1,
@@ -210,12 +202,17 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		tf::Matrix3x3 x_180 = tf::Matrix3x3(1, 0, 0,
 											0, -1, 0,
 											0, 0, -1);
-		rot *= x_180;
 
-		// tf::Matrix3x3 z_90 = tf::Matrix3x3(0, -1, 0,
-		// 									1, 0, 0,
-		// 									0, 0, 1);
-		// rot *= z_90;
+		if (rot[1][1] < 0){
+			rot *= x_180;
+		}
+
+		for(int a = 0;a < 3; a++){
+			for(int b = 0;b < 3; b++){
+				cout << rot[a][b] << " " ;
+			}
+			cout << endl;
+		}
 
 		tf::Transform object_tf = tf::Transform(rot, tran);
 

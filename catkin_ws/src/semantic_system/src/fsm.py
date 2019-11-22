@@ -7,7 +7,7 @@ import smach
 import smach_ros
 from text_msgs.srv import *
 from text_msgs.msg import *
-from std_srvs.srv import Trigger, TriggerResponse, Empty, EmptyResponse, EmptyRequest
+from std_srvs.srv import Trigger, TriggerResponse,TriggerRequest, Empty, EmptyResponse, EmptyRequest
 import rospkg
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -17,17 +17,20 @@ Detect_SRV = "/text_detection/text_detection"
 Object_Pose_SRV = "/object_pose_node"
 Brand_name_Pose_SRV = "/bn_pose_node"
 
+Move_srv = "/arm_control/move_to"
+Home_srv = "/arm_control/home"
+
 Initial = 0
 Perception_bn = 1
 pose_bn = 2
 pick_bn = 3
 Perception_obj = 4
 pick_obj = 5
-flip = 6
+FLIP = 6
+HOME = 7
 
 STOP = -99
 ERROR = -999
-
 
 
 class FSM():
@@ -55,7 +58,7 @@ class FSM():
         print "Node (FSM): Finish reading list"
 
     def initial(self):
-
+        self.mani_req = manipulationRequest()
         self.last_img = 0
         self.last_depth = 0
         self.last_mask = 0
@@ -68,6 +71,7 @@ class FSM():
         return TriggerResponse(success=True, message="Request accepted.")
 
     def process(self):
+
         if self.state == Initial:
             rospy.wait_for_service(Initial_gripper)
             try:
@@ -77,6 +81,17 @@ class FSM():
             except rospy.ServiceException, e:
                 print "Service call failed: %s"%e
             self.initial()
+
+            emp = TriggerRequest()
+
+            try:
+                rospy.wait_for_service(Home_srv, timeout=10)
+                home_srv = rospy.ServiceProxy(Home_srv, Trigger)
+                home_resp = home_srv(emp)
+
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+
             self.state = Perception_bn
             return 
 
@@ -121,7 +136,7 @@ class FSM():
                     self.mani_req.object = "Non_known"
                     self.mani_req.pose = recog_resp.ob_list[0].pose
                     print self.mani_req.pose
-                    self.state = STOP
+                    self.state = pick_obj
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
@@ -153,11 +168,60 @@ class FSM():
                     print self.mani_req.pose
                     print "Picking object ", obj_name
                     print "Direction ", str(direct*90)
-                    self.state = STOP
+                    self.state = pick_bn
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
 
+
+        if self.state == pick_bn:  
+            try:
+                rospy.wait_for_service(Move_srv, timeout=10)
+                mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+                mani_resp = mani_move_srv(self.mani_req)
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+                
+            self.gripper_off()
+            self.state = HOME
+            return       
+
+        if self.state == pick_obj:  
+            try:
+                rospy.wait_for_service(Move_srv, timeout=10)
+                mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+                mani_resp = mani_move_srv(self.mani_req)
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+
+            self.gripper_off()
+            self.state = HOME
+            return   
+
+        if self.state == HOME:  
+            emp = TriggerRequest()
+            try:
+                rospy.wait_for_service(Home_srv, timeout=10)
+                home_srv = rospy.ServiceProxy(Home_srv, Trigger)
+                home_resp = home_srv(emp)
+
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+
+            self.state = STOP
+            return   
+
+    def gripper_off(self):
+        rospy.sleep(1.5)
+        rospy.wait_for_service('/gripper_control/close')
+        try:
+            gripper_close_ser = rospy.ServiceProxy('/gripper_control/close', Empty)
+            req = EmptyRequest()
+            resp1 = gripper_close_ser(req)
+            rospy.sleep(1.5)
+
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e       
 
     def shutdown_cb(self):
         rospy.loginfo("Node shutdown")

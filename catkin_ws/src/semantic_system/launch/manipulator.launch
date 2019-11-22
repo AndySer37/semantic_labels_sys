@@ -9,7 +9,7 @@
 		<!-- UR5 driver -->
 		<include file="$(find arm_operation)/launch/ur5_real.launch">
 		    <arg name="robot_ip" default="192.168.50.11" />
-		    <arg name="tool_length" default="0.15"/>
+		    <arg name="tool_length" default="0.17"/>
 		</include>
 		<!-- robotiq 2-finger gripper -->
 		<node name="robotiq2FGripper" pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py"  args="/dev/ttyGripper" required="true"/>
