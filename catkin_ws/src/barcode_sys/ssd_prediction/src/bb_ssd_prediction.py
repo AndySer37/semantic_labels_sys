@@ -69,8 +69,13 @@ class bb_ssd_prediction(object):
 			print(e)
 		img = cv_image.copy()
 		
-
-		(rows, cols, channels) = cv_image.shape
+		(rows, cols, channels) = cv_image.shape	
+		rows = int(np.ceil(rows/32.)*32)
+		cols = int(np.ceil(cols/32.)*32)
+		cv_image1 = np.zeros((rows, cols, channels),dtype = np.uint8)
+		cv_image1[:cv_image.shape[0],:cv_image.shape[1],:cv_image.shape[2]] = cv_image[:,:,:]
+		cv_image = cv_image1.copy()
+		
 		self.width = cols
 		self.height = rows
 		predict_img, obj_list = self.predict(cv_image)
