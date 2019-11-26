@@ -119,7 +119,13 @@ class text_detection(object):
 		except CvBridgeError as e:
 			resp.status = e
 			print(e)
-		
+		(rows, cols, channels) = cv_image.shape	
+		rows = int(np.ceil(rows/32.)*32)
+		cols = int(np.ceil(cols/32.)*32)
+		cv_image1 = np.zeros((rows, cols, channels),dtype = np.uint8)
+		cv_image1[:cv_image.shape[0],:cv_image.shape[1],:cv_image.shape[2]] = cv_image[:,:,:]
+		cv_image = cv_image1.copy()
+
 		mask = np.zeros([cv_image.shape[0], cv_image.shape[1]], dtype = np.uint8)
 		img_list_0_90_180_270 = rotate_cv(cv_image)
 
@@ -209,10 +215,15 @@ class text_detection(object):
 		except CvBridgeError as e:
 			print(e)
 		
-		# (rows, cols, channels) = cv_image.shape
+		(rows, cols, channels) = cv_image.shape
 		# self.width = cols
 		# self.height = rows
-		
+		rows = int(np.ceil(rows/32.)*32)
+		cols = int(np.ceil(cols/32.)*32)
+		cv_image1 = np.zeros((rows, cols, channels),dtype = np.uint8)
+		cv_image1[:cv_image.shape[0],:cv_image.shape[1],:cv_image.shape[2]] = cv_image[:,:,:]
+		cv_image = cv_image1.copy()
+		# cv_image = cv2.resize(cv_image, (1280,736))
 		predict_img, contours = self.predict(cv_image)
 		img_bbox = cv_image.copy()
 
