@@ -20,6 +20,7 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 from ssd import build_ssd
+from u_network import UNet
 import os 
 import message_filters
 
@@ -34,18 +35,22 @@ class bb_ssd_prediction(object):
 		self.objects = []
 		self.network = build_ssd('test', 300, len(self.labels)) 
 		self.is_compressed = False
-
+		self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 		self.cuda_use = torch.cuda.is_available()
+		self.u_net = UNet(n_channels=3, n_classes=1)
+		self.u_net.to(device=self.device)
+		model_name = "UNet.pkl"
+		state_dict = torch.load(os.path.join(self.path, "weights/", model_name))
+		self.u_net.load_state_dict(state_dict)
 
 		if self.cuda_use:
 			self.network = self.network.cuda()
-
 		model_name = "barcode.pth"
 		state_dict = torch.load(os.path.join(self.path, "weights/", model_name))
 		self.network.load_state_dict(state_dict)
 		#### Publisher
-		self.image_pub = rospy.Publisher("~/predict_img", Image, queue_size = 1)
-		self.mask_pub = rospy.Publisher("~/predict_mask", Image, queue_size = 1)
+		self.image_pub = rospy.Publisher("~predict_img", Image, queue_size = 1)
+		self.mask_pub = rospy.Publisher("~predict_mask", Image, queue_size = 1)
 
 		### msg filter 
 
@@ -78,9 +83,10 @@ class bb_ssd_prediction(object):
 		
 		self.width = cols
 		self.height = rows
-		predict_img, obj_list = self.predict(cv_image)
+		predict_img, obj_list, mask = self.predict(cv_image)
 		try:
 			self.image_pub.publish(self.cv_bridge.cv2_to_imgmsg(predict_img, "bgr8"))
+			self.mask_pub.publish(self.cv_bridge.cv2_to_imgmsg(mask, "8UC1"))
 		except CvBridgeError as e:
 			print(e)
 
@@ -95,14 +101,7 @@ class bb_ssd_prediction(object):
 				(int(obj[0] + obj[2]), int(obj[1] + obj[3])), (int(obj[0]), int(obj[1] + obj[3]))]
 
 			cv2.fillConvexPoly(mask, np.asarray(point_list,dtype = np.int), 255)
-			# print point_list
 
-		# try:
-		# 	img = self.cv_bridge.imgmsg_to_cv2(msg.data, "bgr8")
-		# 	depth = self.cv_bridge.imgmsg_to_cv2(msg.depth, "16FC1")
-		# 	mask = self.cv_bridge.imgmsg_to_cv2(msg.mask, "64FC1")
-		# except CvBridgeError as e:
-		# 	print(e)
 	def video_callback(self, img_msg):
 
 		try:
@@ -133,7 +132,9 @@ class bb_ssd_prediction(object):
 			cv2.fillConvexPoly(mask, np.asarray(point_list,dtype = np.int), 255)
 			mask = self.cv_bridge.cv2_to_imgmsg(mask, "8UC1")
 			self.mask_pub.publish(mask)
+
 	def predict(self, img):
+		mask = np.zeros(img.shape[:2], dtype = np.uint8)
 		# Preprocessing
 		image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 		x = cv2.resize(image, (300, 300)).astype(np.float32)
@@ -158,6 +159,31 @@ class bb_ssd_prediction(object):
 					score = detections[0, i, j, 0]
 					pt = (detections[0, i, j,1:]*scale).cpu().numpy()
 					objs.append([pt[0], pt[1], pt[2]-pt[0]+1, pt[3]-pt[1]+1, i])
+					
+					### U net region
+					min_x = int(pt[0]) if int(pt[0]) > 0 else 0
+					min_y = int(pt[1]) if int(pt[1]) > 0 else 0
+					max_x = int(pt[2]) if int(pt[2]) < 640 else 640
+					max_y = int(pt[3]) if int(pt[3]) < 480 else 480
+
+					img_box = image[min_y:max_y, min_x:max_x].copy()
+					h_b, w_b, _ = img_box.shape
+					img_box = cv2.resize(img_box, (64, 64)).astype(np.float32)
+					img_box -= (103.939, 116.779, 123.68)
+					img_box = img_box[:, :, ::-1].copy()
+					img_box = torch.from_numpy(img_box).permute(2, 0, 1)
+					img_box = Variable(img_box.unsqueeze(0)) 
+					inputs = img_box.to(device=self.device, dtype=torch.float32)
+					
+					output = self.u_net(inputs)
+					output = output.data.cpu().numpy()
+					N, _, h, w = output.shape
+					pred = output.transpose(0, 2, 3, 1).reshape(-1, 1).reshape(N, h, w)[0]
+					pred[pred < 0] = 0 
+					pred[pred > 0] = 255
+					pred = cv2.resize(pred, (w_b,h_b))
+					mask[min_y:max_y, min_x:max_x] = pred
+
 
 		for obj in objs:
 			if obj[4] == 1:
@@ -171,11 +197,9 @@ class bb_ssd_prediction(object):
 			cv2.rectangle(img, (int(obj[0]), int(obj[1])),\
 								(int(obj[0] + obj[2]), int(obj[1] + obj[3])), color, 3)
 			cv2.putText(img, self.labels[obj[4]], (int(obj[0] + obj[2]), int(obj[1])), 0, 1, color,2)
-			#print(self.labels[obj[4]])
-		#cv2.imshow('image',img)
-		#cv2.waitKey(0)
-		#cv2.destroyAllWindows()
-		return img, objs
+
+
+		return img, objs, mask
 
 
 	def onShutdown(self):
@@ -183,11 +207,7 @@ class bb_ssd_prediction(object):
 
 
 	def getXYZ(self,xp, yp, zc):
-		#### Definition:
-		# cx, cy : image center(pixel)
-		# fx, fy : focal length
-		# xp, yp: index of the depth image
-		# zc: depth
+
 		inv_fx = 1.0/self.fx
 		inv_fy = 1.0/self.fy
 		x = (xp-self.cx) *  zc * inv_fx
