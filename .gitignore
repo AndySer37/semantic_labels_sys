@@ -5,6 +5,7 @@
 *.pdf
 *.csv
 *.pth
+*.pkl
 *.pyc
 *.jpg
 build/
