@@ -79,7 +79,7 @@ class text_detection(object):
 		depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
 		ts = message_filters.TimeSynchronizer([image_sub, depth_sub], 10)
 		ts.registerCallback(self.callback)
-		self.saver_count = 6
+		self.saver_count = 0
 		if self.saver:
 			self.p_img = os.path.join(self.path, "saver", "img")
 			if not os.path.exists(self.p_img):
@@ -197,7 +197,7 @@ class text_detection(object):
 		vis_mask = np.zeros([cv_image.shape[0], cv_image.shape[1]], dtype = np.uint8)
 		vis_mask[mask != 0] = 255 - mask[mask != 0]
 		if self.saver:
-			self.save_func(img_list_0_90_180_270[0], mask, self.cv_bridge.imgmsg_to_cv2(resp.depth, "16UC1"), cv_image)
+			self.save_func(cv_image1, vis_mask, self.cv_bridge.imgmsg_to_cv2(resp.depth, "16UC1"), cv_image)
 		## srv end
 		self.predict_img_pub.publish(self.cv_bridge.cv2_to_imgmsg(cv_image, "bgr8"))
 		self.predict_mask_pub.publish(self.cv_bridge.cv2_to_imgmsg(vis_mask, "8UC1"))

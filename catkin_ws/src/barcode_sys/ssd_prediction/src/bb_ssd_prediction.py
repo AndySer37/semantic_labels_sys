@@ -23,6 +23,8 @@ from ssd import build_ssd
 from u_network import UNet
 import os 
 import message_filters
+from text_msgs.msg import text_detection_msg, text_detection_array, int_arr
+from text_msgs.srv import *
 
 class bb_ssd_prediction(object):
 	def __init__(self):
@@ -42,7 +44,7 @@ class bb_ssd_prediction(object):
 		model_name = "UNet.pkl"
 		state_dict = torch.load(os.path.join(self.path, "weights/", model_name))
 		self.u_net.load_state_dict(state_dict)
-
+		self.switch = False
 		if self.cuda_use:
 			self.network = self.network.cuda()
 		model_name = "barcode.pth"
@@ -51,6 +53,25 @@ class bb_ssd_prediction(object):
 		#### Publisher
 		self.image_pub = rospy.Publisher("~predict_img", Image, queue_size = 1)
 		self.mask_pub = rospy.Publisher("~predict_mask", Image, queue_size = 1)
+
+		### service
+		self.predict_switch_ser = rospy.Service("~predict_switch_server", predict_switch, self.switch_callback)
+		self.predict_ser = rospy.Service("~barcode_detection", text_detection_srv, self.srv_callback)
+		self.saver = False
+		self.saver_count = 0
+		if self.saver:
+			self.p_img = os.path.join(self.path, "saver", "img")
+			if not os.path.exists(self.p_img):
+				os.makedirs(self.p_img)
+			self.p_depth = os.path.join(self.path, "saver", "depth")
+			if not os.path.exists(self.p_depth):
+				os.makedirs(self.p_depth)
+			self.p_mask = os.path.join(self.path, "saver", "mask")
+			if not os.path.exists(self.p_mask):
+				os.makedirs(self.p_mask)
+			self.p_result = os.path.join(self.path, "saver", "result")
+			if not os.path.exists(self.p_result):
+				os.makedirs(self.p_result)
 
 		### msg filter 
 
@@ -63,7 +84,69 @@ class bb_ssd_prediction(object):
 			ts = message_filters.TimeSynchronizer([image_sub, depth_sub], 10)
 			ts.registerCallback(self.callback)
 
+	def switch_callback(self, req):
+		resp = predict_switchResponse()
+		self.switch = req.data
+		s = "True" if req.data else "False"
+		resp.result = "Switch turn to {}".format(req.data)
+		return resp
+
+	def srv_callback(self, req):
+
+		resp = text_detection_srvResponse()
+		img_msg = rospy.wait_for_message('/camera/color/image_raw', Image, timeout=None)
+		resp.depth = rospy.wait_for_message('/camera/aligned_depth_to_color/image_raw', Image, timeout=None)
+		resp.image = img_msg
+
+		try:
+			if self.is_compressed:
+				np_arr = np.fromstring(img_msg.data, np.uint8)
+				cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+			else:
+				cv_image = self.cv_bridge.imgmsg_to_cv2(img_msg, "bgr8")
+		except CvBridgeError as e:
+			print(e)
+		img = cv_image.copy()
+		
+		(rows, cols, channels) = cv_image.shape	
+		rows = int(np.ceil(rows/32.)*32)
+		cols = int(np.ceil(cols/32.)*32)
+		cv_image1 = np.zeros((rows, cols, channels),dtype = np.uint8)
+		cv_image1[:cv_image.shape[0],:cv_image.shape[1],:cv_image.shape[2]] = cv_image[:,:,:]
+		cv_image = cv_image1.copy()
+		
+		self.width = cols
+		self.height = rows
+		predict_img, obj_list, mask = self.predict(cv_image)
+		try:
+			self.image_pub.publish(self.cv_bridge.cv2_to_imgmsg(predict_img, "bgr8"))
+			self.mask_pub.publish(self.cv_bridge.cv2_to_imgmsg(mask, "8UC1"))
+		except CvBridgeError as e:
+			print(e)
+		resp.mask = self.cv_bridge.cv2_to_imgmsg(mask, "8UC1")
+
+		if self.saver:
+			self.save_func(cv_image1, mask, self.cv_bridge.imgmsg_to_cv2(resp.depth, "16UC1"), predict_img)
+
+		return resp
+
+		# for obj in obj_list:
+		# 	obj[0] = obj[0] - 5
+		# 	obj[1] = obj[1] - 5
+		# 	obj[2] = obj[2] + 10
+		# 	obj[3] = obj[3] + 10
+
+		# 	mask = np.zeros((rows, cols), dtype = np.uint8)
+		# 	point_list = [(int(obj[0]), int(obj[1])),(int(obj[0] + obj[2]),int(obj[1])),\
+		# 		(int(obj[0] + obj[2]), int(obj[1] + obj[3])), (int(obj[0]), int(obj[1] + obj[3]))]
+
+		# 	cv2.fillConvexPoly(mask, np.asarray(point_list,dtype = np.int), 255)
+
+
+
 	def callback(self, img_msg, depth):
+		if not self.switch:
+			return
 		try:
 			if self.is_compressed:
 				np_arr = np.fromstring(img_msg.data, np.uint8)
@@ -184,7 +267,7 @@ class bb_ssd_prediction(object):
 					pred = cv2.resize(pred, (w_b,h_b))
 					mask[min_y:max_y, min_x:max_x] = pred
 
-
+		mask[mask > 0] = 255
 		for obj in objs:
 			if obj[4] == 1:
 				color = (0, 255, 255)
@@ -201,6 +284,13 @@ class bb_ssd_prediction(object):
 
 		return img, objs, mask
 
+	def save_func(self, img, mask, depth, result):
+		cv2.imwrite("{}/{}.png".format(self.p_img, self.saver_count), img)
+		cv2.imwrite("{}/{}.png".format(self.p_mask, self.saver_count), mask)
+		cv2.imwrite("{}/{}.png".format(self.p_depth, self.saver_count), depth)
+		cv2.imwrite("{}/{}.png".format(self.p_result, self.saver_count), result)
+
+		self.saver_count += 1
 
 	def onShutdown(self):
 		rospy.loginfo("Shutdown.")	

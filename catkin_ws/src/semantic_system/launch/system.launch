@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
 <launch>
-	<node name="system_fsm" pkg="semantic_system" type="fsm.py" required="true"/>
-	<node name="arm_control" pkg="arm_control" type="arm_control.py" required="true"/>
+	<node name="system_fsm" pkg="semantic_system" type="fsm.py" required="true" output="screen"/>
+	<node name="arm_control" pkg="arm_control" type="arm_control.py" required="true" output="screen"/>
 </launch>

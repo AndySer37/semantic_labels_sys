@@ -13,6 +13,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 Initial_gripper = '/gripper_control/initial'
 Detect_SRV = "/text_detection/text_detection"
+Barcode_SRV = "/bb_ssd_prediction/barcode_detection"
 # Pose_SRV = "/depth_to_pose/get_pose"
 Object_Pose_SRV = "/object_pose_node"
 Brand_name_Pose_SRV = "/bn_pose_node"
@@ -49,6 +50,7 @@ class FSM():
         self.cv_bridge = CvBridge()
         self.mani_req = manipulationRequest()
         self.start = rospy.Service("~start", Trigger, self.srv_start)
+        self.start = rospy.Service("~barcode_start", Trigger, self.barcode_start)
 
     def read_commodity(self, path):
 
@@ -136,7 +138,7 @@ class FSM():
                     self.mani_req.object = "Non_known"
                     self.mani_req.pose = recog_resp.ob_list[0].pose
                     print self.mani_req.pose
-                    self.state = pick_obj
+                    self.state = HOME
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
@@ -168,7 +170,7 @@ class FSM():
                     print self.mani_req.pose
                     print "Picking object ", obj_name
                     print "Direction ", str(direct*90)
-                    self.state = pick_bn
+                    self.state = HOME
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
@@ -222,6 +224,55 @@ class FSM():
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e       
+
+    def barcode_start(self, req111):
+
+
+        rospy.wait_for_service(Barcode_SRV)
+        try:
+            perception_barcode_ser = rospy.ServiceProxy(Barcode_SRV, text_detection_srv)
+            req = text_detection_srvRequest()
+            resp1 = perception_barcode_ser(req)
+            self.last_img = resp1.image
+            self.last_depth = resp1.depth
+            self.last_mask = resp1.mask
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e 
+
+        upward_list = np.unique(self.cv_bridge.imgmsg_to_cv2(self.last_mask, "8UC1"))
+        print "Brandname result: ", upward_list
+        if len(upward_list) == 1:
+            print "No Barcode Detected !!"
+        else:
+            self.last_count = len(upward_list) - 1
+            self.last_list = upward_list
+        
+        bn_req = bn_pose_srvRequest()
+        bn_req.count = self.last_count
+        for i in self.last_list:
+            if i != 0:
+                bn_req.list.append(i)
+        try:
+            print bn_req.list
+            rospy.wait_for_service(Brand_name_Pose_SRV, timeout=10)
+            bn_req.total_list = len(self.commodity_list)
+            bn_req.image = self.last_img
+            bn_req.depth = self.last_depth
+            bn_req.mask = self.last_mask
+            bn_pose_est_srv = rospy.ServiceProxy(Brand_name_Pose_SRV, bn_pose_srv)
+            recog_resp = bn_pose_est_srv(bn_req)
+
+            if recog_resp.count == 0:
+                print "Error"
+            else:
+                self.mani_req.mode = "Barcode"
+                self.mani_req.object = "Barcode"
+                self.mani_req.pose = recog_resp.ob_list[0].pose
+                print self.mani_req.pose
+        except (rospy.ServiceException, rospy.ROSException), e:
+            print "Service call failed: %s"%e 
+
+
 
     def shutdown_cb(self):
         rospy.loginfo("Node shutdown")
