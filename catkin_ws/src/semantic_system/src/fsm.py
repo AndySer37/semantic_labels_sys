@@ -42,6 +42,7 @@ class FSM():
 
         self.last_state = STOP
         self.state = STOP
+        self.test_without_arm = False
         self.last_img = 0
         self.last_depth = 0
         self.last_mask = 0
@@ -138,7 +139,10 @@ class FSM():
                     self.mani_req.object = "Non_known"
                     self.mani_req.pose = recog_resp.ob_list[0].pose
                     print self.mani_req.pose
-                    self.state = HOME
+                    if self.test_without_arm:
+                        self.state = HOME
+                    else:
+                        self.state = pick_obj
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
@@ -170,7 +174,10 @@ class FSM():
                     print self.mani_req.pose
                     print "Picking object ", obj_name
                     print "Direction ", str(direct*90)
-                    self.state = HOME
+                    if self.test_without_arm:
+                        self.state = HOME
+                    else:
+                        self.state = pick_bn
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
@@ -210,6 +217,8 @@ class FSM():
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
 
+
+            self.gripper_open()
             self.state = STOP
             return   
 
@@ -224,6 +233,19 @@ class FSM():
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e       
+
+    def gripper_open(self):
+        rospy.sleep(1.5)
+        rospy.wait_for_service('/gripper_control/open')
+        try:
+            gripper_close_ser = rospy.ServiceProxy('/gripper_control/open', Empty)
+            req = EmptyRequest()
+            resp1 = gripper_close_ser(req)
+            rospy.sleep(1.5)
+
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e       
+
 
     def barcode_start(self, req111):
 
