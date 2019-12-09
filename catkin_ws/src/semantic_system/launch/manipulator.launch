@@ -18,7 +18,13 @@
 
 <!-- 		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.014 -0.06 0.004 0 0 0  ee_link camera_link  100"/> -->
 
-		<node name="gripper_control" pkg="arm_control" type="gripper_control.py" required="true"/>
+		<!-- 2-finger gripper control -->
+		<node name="gripper_control" pkg="arm_control" type="gripper_control.py" required="true" output="screen"/>
+		<!-- Vacuum system -->
+		<node name="vacuum_control" pkg="vacuum_control" type="vacuum_control.py" required="true" output="screen">
+			<param name="baud" value="115200"/>
+    		<param name="port" value="/dev/ttyACM0"/>
+		</node>
 	</group>
 
 </launch>

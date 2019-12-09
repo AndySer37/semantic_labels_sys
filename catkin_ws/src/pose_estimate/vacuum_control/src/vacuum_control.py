@@ -12,18 +12,22 @@ class vacuum_control(object):
     def __init__(self):
         port = rospy.get_param('~port', '/dev/ttyACM0')
         baud = rospy.get_param('~baud', 115200)
-        self.serial = serial.Serial(port=port, baudrate=baud, bytesize=8, parity='N', stopbits=1, timeout=2,rtscts=True,dsrdtr=True)
-        self.serial.isOpen()   
-        self.res = self.serial.readall()
-        self.gripper_in = rospy.Service("~off", Empty, self.in_ser)
-        self.gripper_out = rospy.Service("~on", Empty, self.out_ser)
-        self.suck = rospy.Service("~suck", Empty, self.suck_ser)
-        self.blow = rospy.Service("~blow", Empty, self.blow_ser)
-        self.normal = rospy.Service("~normal", Empty, self.narmal_ser)
-        self.weak_blow = rospy.Service("~weak_blow", Empty, self.weak_blow_ser)
-
-        rospy.loginfo("Vacuum Node Ready for port: {}, baudrate: {}.".format(port, baud))
-
+        try:
+            self.serial = serial.Serial(port=port, baudrate=baud, bytesize=8, parity='N', stopbits=1, timeout=2,rtscts=True,dsrdtr=True)
+            self.serial.isOpen()   
+            self.res = self.serial.readall()
+            self.gripper_in = rospy.Service("~off", Empty, self.in_ser)
+            self.gripper_out = rospy.Service("~on", Empty, self.out_ser)
+            self.suck = rospy.Service("~suck", Empty, self.suck_ser)
+            self.blow = rospy.Service("~blow", Empty, self.blow_ser)
+            self.normal = rospy.Service("~normal", Empty, self.narmal_ser)
+            self.weak_blow = rospy.Service("~weak_blow", Empty, self.weak_blow_ser) 
+            rospy.loginfo("Vacuum Node Ready for port: {}, baudrate: {}.".format(port, baud))
+        except (rospy.ServiceException, rospy.ROSException, serial.SerialException), e:
+            rospy.logerr("Could not connect to vacuum system.")
+            rospy.logerr(e)
+        
+        
     def in_ser(self, req):
 
         rospy.loginfo("Gripper status: 2-finger!")
