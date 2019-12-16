@@ -60,7 +60,7 @@ class text_detection(object):
 		if self.cuda_use:
 			self.network = self.network.cuda()
 
-		model_name = "textsnake_vgg_0.pth"
+		model_name = "textsnake.pth"
 		self.network.load_model(os.path.join(self.path, "weights/", model_name))
 
 		self.detector = TextDetector(self.network, tr_thresh=0.6, tcl_thresh=0.4)
@@ -95,6 +95,7 @@ class text_detection(object):
 				os.makedirs(self.p_result)
 
 		print "============ Ready ============"
+		print "TextSnake Model Parameters number: " + str(self.count_parameters(self.network))
 
 	def read_commodity(self, path):
 
@@ -102,6 +103,9 @@ class text_detection(object):
 			line = line.rstrip('\n')
 			self.commodity_list.append(line)
 		print "Node (text_detection): Finish reading list"
+
+	def count_parameters(self, model):
+		return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 	def srv_callback(self, req):
 		text_array = text_detection_array()

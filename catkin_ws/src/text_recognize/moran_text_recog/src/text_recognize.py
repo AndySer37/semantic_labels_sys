@@ -56,8 +56,8 @@ class text_recognize(object):
 		else:
 			self.network = MORAN(1, len(self.alphabet.split(':')), 256, 32, 100, BidirDecoder=True, inputDataType='torch.FloatTensor', CUDA=cuda_flag)
 
-		model_name = "demo.pth"
-
+		model_name = "moran.pth"
+		print "Moran Model Parameters number: " + str(self.count_parameters(self.network))
 		if self.cuda_use:
 		    state_dict = torch.load(os.path.join(self.path, "weights/", model_name))
 		else:
@@ -89,12 +89,16 @@ class text_recognize(object):
 		# ts.registerCallback(self.callback)
 		print "============ Ready ============"
 
+
 	def read_commodity(self, path):
 
 		for line in open(path, "r"):
 			line = line.rstrip('\n')
 			self.commodity_list.append(line)
 		print "Node (text_recognize): Finish reading list"
+
+	def count_parameters(self, model):
+		return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 	def callback(self, msg):
 		try:
