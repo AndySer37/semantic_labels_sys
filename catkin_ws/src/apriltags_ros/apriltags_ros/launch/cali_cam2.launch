@@ -1,8 +1,8 @@
 <launch>
   <node pkg="apriltags_ros" type="apriltag_detector_node" name="apriltag_detector_cam2" output="screen" ns="detection2">
     <!-- Remap topic required by the node to custom topics -->
-    <remap from="image_rect" to="/camera2/color/image_raw" />
-    <remap from="camera_info" to="/camera2/color/camera_info" />
+    <remap from="image_rect" to="/camera/color/image_raw" />
+    <remap from="camera_info" to="/camera/color/camera_info" />
 
     <!-- Optional: Subscribe to the compressed stream-->
     <param name="image_transport" type="str" value="compressed" />

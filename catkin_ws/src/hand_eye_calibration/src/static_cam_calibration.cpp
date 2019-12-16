@@ -58,8 +58,8 @@ class calibration{
    */
   bool get_tag_data(tf::StampedTransform &t){
     try{
-      listener.waitForTransform("zed_left_camera_optical_frame", tag_frame, ros::Time(0), ros::Duration(2.0));
-      listener.lookupTransform("zed_left_camera_optical_frame", tag_frame, ros::Time(0), t);
+      listener.waitForTransform("camera_link", tag_frame, ros::Time(0), ros::Duration(2.0));
+      listener.lookupTransform("camera_link", tag_frame, ros::Time(0), t);
     } catch(tf::TransformException ex){
       ROS_ERROR("%s", ex.what());
       return 0;
