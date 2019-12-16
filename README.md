@@ -18,13 +18,13 @@ git pull --recurse-submodules
 ```
 Path : semantic_lables_sys/catkin_ws/src/text_recognize/moran_text_recog/weights
 ```
-https://drive.google.com/open?id=1lx8I6YBxZfL1GPhiJA9_YG0cYt4AD0Wy
+https://drive.google.com/file/d/1tv8osHoHazyJgErZSK6Jr4wLIGI-_fyS/view?usp=sharing
 
 #### Text detection
 ```
 Path : semantic_lables_sys/catkin_ws/src/text_detection/textsnake/weights
 ```
-https://drive.google.com/open?id=1lXbArdtTTvwlO_NhkgohHtasmfBMCNmw
+https://drive.google.com/file/d/1NMuvf8G3FpyqEnrqwOC3TBLfZ47gyOwJ/view?usp=sharing
 
 ### How to run the Brandname segmentation node
 
