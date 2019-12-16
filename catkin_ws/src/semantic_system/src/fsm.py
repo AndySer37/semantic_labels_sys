@@ -29,6 +29,7 @@ Perception_obj = 4
 pick_obj = 5
 FLIP = 6
 HOME = 7
+Prepare_Pick = 8
 
 STOP = -99
 ERROR = -999
@@ -71,6 +72,7 @@ class FSM():
     def srv_start(self, req):
 
         self.state = Initial
+        self.last_state = Initial
         return TriggerResponse(success=True, message="Request accepted.")
 
     def process(self):
@@ -113,10 +115,12 @@ class FSM():
             upward_list = np.unique(self.cv_bridge.imgmsg_to_cv2(self.last_mask, "8UC1"))
             print "Brandname result: ", upward_list
             if len(upward_list) == 1:
+                self.last_state = Perception_bn
                 self.state = Perception_obj
                 self.last_count = 0
                 self.last_list = []
             else:
+                self.last_state = Perception_bn
                 self.state = pose_bn
                 self.last_count = len(upward_list) - 1
                 self.last_list = upward_list
@@ -133,6 +137,7 @@ class FSM():
 
                 print "Object num: ", recog_resp.count
                 if recog_resp.count == 0:
+                    self.last_state = Perception_obj
                     self.state = STOP
                 else:
                     self.mani_req.mode = "Object"
@@ -140,9 +145,11 @@ class FSM():
                     self.mani_req.pose = recog_resp.ob_list[0].pose
                     print self.mani_req.pose
                     if self.test_without_arm:
+                        self.last_state = Perception_obj
                         self.state = HOME
                     else:
-                        self.state = pick_obj
+                        self.last_state = Perception_obj
+                        self.state = Prepare_Pick
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
@@ -164,6 +171,7 @@ class FSM():
                 recog_resp = bn_pose_est_srv(bn_req)
 
                 if recog_resp.count == 0:
+                    self.last_state = pose_bn
                     self.state = ERROR
                 else:
                     direct = recog_resp.ob_list[0].object / len(self.commodity_list)
@@ -175,13 +183,33 @@ class FSM():
                     print "Picking object ", obj_name
                     print "Direction ", str(direct*90)
                     if self.test_without_arm:
+                        self.last_state = pose_bn
                         self.state = HOME
                     else:
-                        self.state = pick_bn
+                        self.last_state = pose_bn
+                        self.state = Prepare_Pick
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
 
+        if self.state == Prepare_Pick:
+            self.mani_req.pose.position.z += 0.1
+            try:
+                rospy.wait_for_service(Move_srv, timeout=10)
+                mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+                mani_resp = mani_move_srv(self.mani_req)
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+
+            self.mani_req.pose.position.z -= 0.1
+            
+            if self.last_state == Perception_obj:
+                self.last_state = Prepare_Pick
+                self.state = pick_obj
+            elif self.last_state == pose_bn:
+                self.last_state = Prepare_Pick
+                self.state = pick_bn       
+            return              
 
         if self.state == pick_bn:  
             try:
@@ -192,6 +220,7 @@ class FSM():
                 print "Service call failed: %s"%e 
                 
             self.gripper_off()
+            self.last_state = pick_bn
             self.state = HOME
             return       
 
@@ -204,6 +233,7 @@ class FSM():
                 print "Service call failed: %s"%e 
 
             self.gripper_off()
+            self.last_state = pick_obj
             self.state = HOME
             return   
 
@@ -219,6 +249,7 @@ class FSM():
 
 
             self.gripper_open()
+            self.last_state = HOME
             self.state = STOP
             return   
 

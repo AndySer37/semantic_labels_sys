@@ -19,7 +19,7 @@
 <!-- 		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.026917 -0.004526 0.084048 -0.029901 0.060039 -0.004373 0.997738  ee_link camera_link  100"/> -->
 
 		<!-- Static Cam -->
-		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.460625 -0.142902 0.738042 0.006577 0.703779 0.005296 0.710369 base_link camera_link  100"/>
+		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.460625 -0.132902 0.738042 1.065008 1.591603 1.063196 base_link camera_link  100"/>
 
 		<!-- 2-finger gripper control -->
 		<node name="gripper_control" pkg="arm_control" type="gripper_control.py" required="true" output="screen"/>
