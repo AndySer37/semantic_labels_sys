@@ -85,6 +85,7 @@ class arm_control(object):
         self.suck_func()
         return TriggerResponse(success=True, message="Request accepted.")
 
+
     def joint_func(self, joint):
         rospy.wait_for_service('/ur5_control_server/ur_control/goto_joint_pose')
         try:

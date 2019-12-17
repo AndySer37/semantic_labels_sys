@@ -203,7 +203,7 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 											0, -1, 0,
 											0, 0, -1);
 
-		if (rot[1][1] < 0){
+		if (rot[1][2] > 0){
 			rot *= x_180;
 		}
 
@@ -272,7 +272,7 @@ object_pose_node::object_pose_node(){
 	ec.setMaxClusterSize (30000);
 	ec.setSearchMethod (tree);
 
-	lower_bound = 0.025;
+	lower_bound = 0.04;
 	upper_bound = 0.16;
 	z_range = 0.03;
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
