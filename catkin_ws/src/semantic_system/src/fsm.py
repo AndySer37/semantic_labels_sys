@@ -10,6 +10,7 @@ from text_msgs.msg import *
 from std_srvs.srv import Trigger, TriggerResponse,TriggerRequest, Empty, EmptyResponse, EmptyRequest
 import rospkg
 from cv_bridge import CvBridge, CvBridgeError
+from pyquaternion import Quaternion 
 
 Initial_gripper = '/gripper_control/initial'
 Detect_SRV = "/text_detection/text_detection"
@@ -18,8 +19,13 @@ Barcode_SRV = "/bb_ssd_prediction/barcode_detection"
 Object_Pose_SRV = "/object_pose_node"
 Brand_name_Pose_SRV = "/bn_pose_node"
 
+## Arm_process
 Move_srv = "/arm_control/move_to"
 Home_srv = "/arm_control/home"
+Flip_srv = "/arm_control/flip"
+Suck_srv = "/arm_control/suck_process"
+
+
 
 Initial = 0
 Perception_bn = 1
@@ -115,15 +121,14 @@ class FSM():
             upward_list = np.unique(self.cv_bridge.imgmsg_to_cv2(self.last_mask, "8UC1"))
             print "Brandname result: ", upward_list
             if len(upward_list) == 1:
-                self.last_state = Perception_bn
                 self.state = Perception_obj
                 self.last_count = 0
                 self.last_list = []
             else:
-                self.last_state = Perception_bn
                 self.state = pose_bn
                 self.last_count = len(upward_list) - 1
                 self.last_list = upward_list
+            self.last_state = Perception_bn
             return 
 
         if self.state == Perception_obj:  
@@ -143,13 +148,19 @@ class FSM():
                     self.mani_req.mode = "Object"
                     self.mani_req.object = "Non_known"
                     self.mani_req.pose = recog_resp.ob_list[0].pose
+                    q_pose = Quaternion(self.mani_req.pose.orientation.w, self.mani_req.pose.orientation.x, self.mani_req.pose.orientation.y, self.mani_req.pose.orientation.z)
+                    q_max = q_pose.rotation_matrix
+                    trans = np.array([0,0,-0.05],dtype = np.float32)
+                    trans = np.dot(q_max,trans)
+                    self.mani_req.pose.position.x += trans[0]
+                    self.mani_req.pose.position.y += trans[1]
+                    self.mani_req.pose.position.z += trans[2]
                     print self.mani_req.pose
                     if self.test_without_arm:
-                        self.last_state = Perception_obj
                         self.state = HOME
                     else:
-                        self.last_state = Perception_obj
                         self.state = Prepare_Pick
+                    self.last_state = Perception_obj
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
@@ -183,11 +194,10 @@ class FSM():
                     print "Picking object ", obj_name
                     print "Direction ", str(direct*90)
                     if self.test_without_arm:
-                        self.last_state = pose_bn
                         self.state = HOME
                     else:
-                        self.last_state = pose_bn
                         self.state = Prepare_Pick
+                    self.last_state = pose_bn
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
@@ -204,11 +214,11 @@ class FSM():
             self.mani_req.pose.position.z -= 0.1
             
             if self.last_state == Perception_obj:
-                self.last_state = Prepare_Pick
+                self.mani_req.pose.position.z += 0.03
                 self.state = pick_obj
             elif self.last_state == pose_bn:
-                self.last_state = Prepare_Pick
-                self.state = pick_bn       
+                self.state = pick_bn 
+            self.last_state = Prepare_Pick
             return              
 
         if self.state == pick_bn:  
@@ -232,10 +242,37 @@ class FSM():
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
 
-            self.gripper_off()
+            try:
+                emp = TriggerRequest()
+                rospy.wait_for_service(Suck_srv, timeout=10)
+                suck = rospy.ServiceProxy(Suck_srv, Trigger)
+                emp_resp = suck(emp)
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+            self.mani_req.pose.position.z += 0.2
+            try:
+                rospy.wait_for_service(Move_srv, timeout=10)
+                mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+                mani_resp = mani_move_srv(self.mani_req)
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+
             self.last_state = pick_obj
-            self.state = HOME
+            self.state = FLIP
             return   
+
+        if self.state == FLIP:  
+            emp = TriggerRequest()
+            try:
+                rospy.wait_for_service(Flip_srv, timeout=10)
+                flip_srv = rospy.ServiceProxy(Flip_srv, Trigger)
+                emp_resp = flip_srv(emp)
+            except (rospy.ServiceException, rospy.ROSException), e:
+                print "Service call failed: %s"%e 
+
+            self.last_state = FLIP
+            self.state = HOME
+            return
 
         if self.state == HOME:  
             emp = TriggerRequest()
@@ -247,10 +284,13 @@ class FSM():
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
 
+            if self.last_state == pick_bn:
+                self.gripper_open()
+                self.state = STOP
+            elif self.last_state == FLIP:
+                self.state = Perception_bn
 
-            self.gripper_open()
             self.last_state = HOME
-            self.state = STOP
             return   
 
     def gripper_off(self):
@@ -279,7 +319,6 @@ class FSM():
 
 
     def barcode_start(self, req111):
-
 
         rospy.wait_for_service(Barcode_SRV)
         try:
@@ -324,7 +363,6 @@ class FSM():
                 print self.mani_req.pose
         except (rospy.ServiceException, rospy.ROSException), e:
             print "Service call failed: %s"%e 
-
 
 
     def shutdown_cb(self):
