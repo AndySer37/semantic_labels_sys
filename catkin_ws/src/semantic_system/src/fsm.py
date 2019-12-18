@@ -174,7 +174,7 @@ class FSM():
                 print "Service call failed: %s"%e 
             return 
 
-        if self.state == pose_bn:  
+        if self.state == pose_bn:
             bn_req = bn_pose_srvRequest()
             bn_req.count = self.last_count
             for i in self.last_list:
