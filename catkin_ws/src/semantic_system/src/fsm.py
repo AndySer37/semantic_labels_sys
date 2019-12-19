@@ -5,6 +5,7 @@ import roslib
 import rospy
 import smach
 import smach_ros
+import tf
 from text_msgs.srv import *
 from text_msgs.msg import *
 from std_srvs.srv import Trigger, TriggerResponse,TriggerRequest, Empty, EmptyResponse, EmptyRequest
@@ -14,6 +15,7 @@ from sensor_msgs.msg import JointState
 import rospkg
 from cv_bridge import CvBridge, CvBridgeError
 from pyquaternion import Quaternion 
+from converter import  *
 
 Initial_gripper = '/gripper_control/initial'
 Detect_SRV = "/text_detection/text_detection"
@@ -145,7 +147,7 @@ class FSM():
             try:
                 rospy.wait_for_service(Object_Pose_SRV, timeout=10)
                 object_req.image = self.last_img
-                object_req.depth = self.last_depth
+                object_req.depth = self.last_depth 
                 object_pose_srv = rospy.ServiceProxy(Object_Pose_SRV, object_only)
                 recog_resp = object_pose_srv(object_req)
 
@@ -200,6 +202,19 @@ class FSM():
                     self.mani_req.object = obj_name
                     self.mani_req.pose = recog_resp.ob_list[0].pose
                     self.rot = direct
+                    q_pose = Quaternion(self.mani_req.pose.orientation.w, self.mani_req.pose.orientation.x, self.mani_req.pose.orientation.y, self.mani_req.pose.orientation.z)
+                    q_mat = q_pose.rotation_matrix 
+                    rpy = rot_to_rpy(q_mat)
+                    print "old =====" ,rpy
+                    inv = -1 if np.abs(rpy[0]) > math.pi/2 else 1
+                    q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
+                    print "old222 =====" ,rot_to_rpy(q_new_mat)
+                    q_new_pose = Quaternion(matrix=q_new_mat)
+                    self.mani_req.pose.orientation.w = q_new_pose.w
+                    self.mani_req.pose.orientation.x = q_new_pose.x
+                    self.mani_req.pose.orientation.y = q_new_pose.y
+                    self.mani_req.pose.orientation.z = q_new_pose.z  
+                    self.pub_tf(self.mani_req.pose, "rectify_rot")
                     print self.mani_req.pose
                     print "Picking object ", obj_name
                     print "Direction ", str(direct*90)
@@ -214,27 +229,20 @@ class FSM():
 
         if self.state == Prepare_Pick:
             if self.rot >= 2:
-                #################
                 object_req = object_onlyRequest()
                 rospy.wait_for_service(Object_Pose_SRV, timeout=10)
                 object_req.image = self.last_img
                 object_req.depth = self.last_depth
                 object_pose_srv = rospy.ServiceProxy(Object_Pose_SRV, object_only)
                 recog_resp = object_pose_srv(object_req)
-                self.mani_req.pose = recog_resp.ob_list[0].pose
-                #################
-                # q_pose = Quaternion(self.mani_req.pose.orientation.w, self.mani_req.pose.orientation.x, self.mani_req.pose.orientation.y, self.mani_req.pose.orientation.z)
-                # q_mat = q_pose.rotation_matrix
-                # new_mat = np.dot(q_mat, self.x_180)
-                # q_new_pose = Quaternion(matrix=new_mat)
-                # print ("Old: ", q_pose)
-                # print ("New: ", q_new_pose)
-                # self.mani_req.pose.orientation.w = q_new_pose.w
-                # self.mani_req.pose.orientation.x = q_new_pose.x
-                # self.mani_req.pose.orientation.y = q_new_pose.y
-                # self.mani_req.pose.orientation.z = q_new_pose.z  
+                if len(recog_resp.ob_list) > 0:
+                    self.mani_req.pose = recog_resp.ob_list[0].pose
+                else:
+                    self.state = ERROR
+                    print "Can't find object pose !"
+                    return
 
-            self.mani_req.pose.position.z += 0.1
+            self.mani_req.pose.position.z += 0.06
             try:
                 rospy.wait_for_service(Move_srv, timeout=10)
                 mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -242,7 +250,7 @@ class FSM():
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
 
-            self.mani_req.pose.position.z -= 0.1
+            self.mani_req.pose.position.z -= 0.06
             
             if self.last_state == Perception_obj:
                 self.mani_req.pose.position.z += 0.025
@@ -289,7 +297,7 @@ class FSM():
                 emp_resp = suck(emp)
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
-            self.mani_req.pose.position.z += 0.2
+            self.mani_req.pose.position.z += 0.1
             try:
                 rospy.wait_for_service(Move_srv, timeout=10)
                 mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -363,27 +371,23 @@ class FSM():
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e        
 
-        # rospy.wait_for_service(Get_pose)
-        # try:
-        #     ur5_joint_ser = rospy.ServiceProxy(Get_pose, getTCPPose)
-        #     req = getTCPPoseRequest()
-        #     resp1 = ur5_joint_ser(req)
-        #     self.mani_req.pose.position = resp1.tcp_pose.position
-        #     self.mani_req.pose.orientation = resp1.tcp_pose.orientation
-        #     self.mani_req.pose.position.z -= 0.09
-        # except rospy.ServiceException, e:
-        #     print "Service call failed: %s"%e   
-
-        # try:
-        #     rospy.wait_for_service(Move_srv, timeout=10)
-        #     mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
-        #     mani_resp = mani_move_srv(self.mani_req)
-        # except (rospy.ServiceException, rospy.ROSException), e:
-        #     print "Service call failed: %s"%e 
-
         self.gripper_open()
 
-        self.mani_req.pose.position.z += 0.15
+        try:
+            ur5_joint_ser = rospy.ServiceProxy(Goto_joint, joint_pose)
+            req = joint_poseRequest()
+            msg = joint_value()
+            for i in range(6):
+                msg.joint_value[i] = joint.position[i]
+            msg.joint_value[1] -= 0.2
+            msg.joint_value[5] = 1.3
+            req.joints.append(msg)
+            req.factor = 0.5
+            resp1 = ur5_joint_ser(req)
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e 
+
+        self.mani_req.pose.position.z += 0.1
         try:
             rospy.wait_for_service(Move_srv, timeout=10)
             mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -463,6 +467,17 @@ class FSM():
         except (rospy.ServiceException, rospy.ROSException), e:
             print "Service call failed: %s"%e 
 
+    def pub_tf(self, pose, frame_name):
+        q_pose = Quaternion(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z)
+        q_mat = q_pose.rotation_matrix 
+        rpy = rot_to_rpy(q_mat)
+        print "new =====" ,rpy
+        br = tf.TransformBroadcaster()
+        br.sendTransform((pose.position.x, pose.position.y, pose.position.z),
+                        tf.transformations.quaternion_from_euler(rpy[0], rpy[1], rpy[2]),
+                        rospy.Time.now(),
+                        frame_name,
+                        "base_link")    
 
     def shutdown_cb(self):
         rospy.loginfo("Node shutdown")

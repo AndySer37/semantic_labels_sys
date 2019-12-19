@@ -9,7 +9,7 @@
 		<!-- UR5 driver -->
 		<include file="$(find arm_operation)/launch/ur5_real.launch">
 		    <arg name="robot_ip" default="192.168.50.11" />
-		    <arg name="tool_length" default="0.17"/>
+		    <arg name="tool_length" default="0.185"/>
 		</include>
 		<!-- robotiq 2-finger gripper -->
 		<node name="robotiq2FGripper" pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py"  args="/dev/ttyGripper" required="true"/>
@@ -19,7 +19,7 @@
 <!-- 		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.026917 -0.004526 0.084048 -0.029901 0.060039 -0.004373 0.997738  ee_link camera_link  100"/> -->
 
 		<!-- Static Cam -->
-		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.460625 -0.132902 0.738042 1.065008 1.591603 1.063196 base_link camera_link  100"/>
+		<node pkg="tf" type="static_transform_publisher" name="cam_publisher" args="0.453453 -0.133576 0.652721 -1.068006 1.54025 -1.070790 base_link camera_link  100"/>
 
 		<!-- 2-finger gripper control -->
 		<node name="gripper_control" pkg="arm_control" type="gripper_control.py" required="true" output="screen"/>

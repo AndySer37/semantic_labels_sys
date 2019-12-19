@@ -1,6 +1,6 @@
 background
 crayons
-kloone
+kloonex
 vanish
 milo
 raisins
@@ -10,3 +10,5 @@ stax
 hunts
 3m
 dove
+pringles
+scotch

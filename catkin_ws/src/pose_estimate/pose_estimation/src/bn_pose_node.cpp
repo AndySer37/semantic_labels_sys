@@ -267,7 +267,7 @@ bn_pose_node::bn_pose_node(){
 	output.reset(new PointCloud<PointXYZRGB>());
 	process.reset(new PointCloud<PointXYZRGB>());
 
-	sor.setMeanK (10);
+	sor.setMeanK (30);
 	sor.setStddevMulThresh (0.8);
 	downsample.setLeafSize (0.005, 0.005, 0.005);
 

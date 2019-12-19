@@ -269,7 +269,7 @@ class text_recognize(object):
 
 		# total = get / total
 
-		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) > 0.4
+		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) >= 0.5
 		# source, _conf, _bool
 	def onShutdown(self):
 		rospy.loginfo("Shutdown.")	
