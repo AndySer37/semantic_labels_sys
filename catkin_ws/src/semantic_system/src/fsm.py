@@ -57,7 +57,7 @@ class FSM():
 
         self.last_state = STOP
         self.state = STOP
-        self.test_without_arm = False
+        self.test_without_arm = True
         self.last_img = 0
         self.last_depth = 0
         self.last_mask = 0
