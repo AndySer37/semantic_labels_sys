@@ -217,60 +217,75 @@ class text_recognize(object):
 		return img, mask
 
 	def conf_of_word(self, target):
+		### Edit distance
 		total = np.zeros(len(self.commodity_list))
-
 		for i in range(1, len(self.commodity_list)):
+			size_x = len(self.commodity_list[i]) + 1
+			size_y = len(target) + 1
+			matrix = np.zeros ((size_x, size_y))
+			for x in xrange(size_x):
+				matrix [x, 0] = x
+			for y in xrange(size_y):
+				matrix [0, y] = y
 
-			# if self.commodity_list[i] != "raisins":
-			# 	continue
-
-			err = 0  ## error 
-			_len = len(self.commodity_list[i])
-			arr = -10 * np.ones(_len)
-			for j in range(len(target)):
-				index = self.commodity_list[i].find(target[j])
-				if index == -1:
-					err += 1
-				else:
-					upper = arr[index+1] if index != _len - 1 else -10
-					if arr[index] == -10 and upper == -10:
-						arr[index] = j
+			for x in xrange(1, size_x):
+				for y in xrange(1, size_y):
+					if self.commodity_list[i][x-1] == target[y-1]:
+						matrix [x,y] = min(
+							matrix[x-1, y] + 1,
+							matrix[x-1, y-1],
+							matrix[x, y-1] + 1
+						)
 					else:
-						index = self.commodity_list[i].find(target[j], index + 1)
-						while index != -1:
-							lower = arr[index-1] if index != 0 else -10
-							upper = arr[index+1] if index != _len - 1 else -10
-							if (arr[index] - lower) == 1 or (upper - arr[index]) == 1:
-								index = self.commodity_list[i].find(target[j], index + 1)
-							else:
-								arr[index] = j
-								break
-
-			score = 0   # score for word 
-			for j in range(_len - 1):
-				if arr[j+1] - arr[j] == 1:
-					score += 1
-			total[i] = float(score) / (_len + err - 1)
-			# print score, _len, err, arr
+						matrix [x,y] = min(
+							matrix[x-1,y] + 1,
+							matrix[x-1,y-1] + 1,
+							matrix[x,y-1] + 1
+						)
+			# print (matrix)
+			total[i] = (size_x - matrix[size_x-1, size_y-1]) / float(size_x)
+		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) >= 0.5		
 
 
-		# get = np.zeros(len(self.commodity_list))
+		### old method
+		# total = np.zeros(len(self.commodity_list))
 		# for i in range(1, len(self.commodity_list)):
-		# 	for word in self.commodity_list[i]:
-		# 		if target.find(word) != -1:
-		# 			get[i] += 1
+
+		# 	# if self.commodity_list[i] != "raisins":
+		# 	# 	continue
+
+		# 	err = 0  ## error 
+		# 	_len = len(self.commodity_list[i])
+		# 	arr = -10 * np.ones(_len)
+		# 	for j in range(len(target)):
+		# 		index = self.commodity_list[i].find(target[j])
+		# 		if index == -1:
+		# 			err += 1
 		# 		else:
-		# 			get[i] -= 1
-		# 		total[i] += 1
-		# 	for j in range(len(self.commodity_list[i])-1):
-		# 		if target.find(self.commodity_list[i][j:j+2]) != -1:
-		# 			get[i] += 3
-		# 		total[i] += 3
+		# 			upper = arr[index+1] if index != _len - 1 else -10
+		# 			if arr[index] == -10 and upper == -10:
+		# 				arr[index] = j
+		# 			else:
+		# 				index = self.commodity_list[i].find(target[j], index + 1)
+		# 				while index != -1:
+		# 					lower = arr[index-1] if index != 0 else -10
+		# 					upper = arr[index+1] if index != _len - 1 else -10
+		# 					if (arr[index] - lower) == 1 or (upper - arr[index]) == 1:
+		# 						index = self.commodity_list[i].find(target[j], index + 1)
+		# 					else:
+		# 						arr[index] = j
+		# 						break
 
-		# total = get / total
+		# 	score = 0   # score for word 
+		# 	for j in range(_len - 1):
+		# 		if arr[j+1] - arr[j] == 1:
+		# 			score += 1
+		# 	total[i] = float(score) / (_len + err - 1)
+		# 	# print score, _len, err, arr
 
-		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) >= 0.5
-		# source, _conf, _bool
+
+		# return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) >= 0.5
+
 	def onShutdown(self):
 		rospy.loginfo("Shutdown.")	
 	
