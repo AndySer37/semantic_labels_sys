@@ -244,7 +244,7 @@ class text_recognize(object):
 						)
 			# print (matrix)
 			total[i] = (size_x - matrix[size_x-1, size_y-1]) / float(size_x)
-		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) >= 0.5		
+		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) >= 0.66		
 
 
 		### old method
