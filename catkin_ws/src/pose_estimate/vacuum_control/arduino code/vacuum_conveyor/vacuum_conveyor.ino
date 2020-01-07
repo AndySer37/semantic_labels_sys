@@ -10,7 +10,7 @@
 #define VACUUM_GENERATOR      7
 #define VACUUM_BREAKER        6
 #define PNEUMATIC_CYLINDER    5
-
+#define CONVRYOR_CONTROL      4
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -18,6 +18,7 @@ void setup() {
   pinMode(VACUUM_GENERATOR, OUTPUT);
   pinMode(VACUUM_BREAKER, OUTPUT);
   pinMode(PNEUMATIC_CYLINDER, OUTPUT);
+  pinMode(CONVRYOR_CONTROL, OUTPUT);
 }
 
 void loop() {
@@ -58,6 +59,17 @@ void loop() {
           digitalWrite(VACUUM_GENERATOR, HIGH);
           delay(1);
           digitalWrite(VACUUM_BREAKER, HIGH);
+          break;
+      }
+    }
+    else if(command_type=='c'){
+      int command = command_str[1]-'0';
+      switch(command){
+        case 0:
+          digitalWrite(CONVRYOR_CONTROL, LOW);
+          break;
+        case 1:
+          digitalWrite(CONVRYOR_CONTROL, HIGH);
           break;
       }
     }
