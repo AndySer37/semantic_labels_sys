@@ -32,6 +32,10 @@ Home_srv = "/arm_control/home"
 Flip_srv = "/arm_control/flip"
 Suck_srv = "/arm_control/suck_process"
 
+## Data science 
+Raisin_srv = "/arm_control/raisin"
+Crayon_srv = "/arm_control/crayon"
+
 ## topic
 Joint_value = "/joint_states"
 
@@ -47,6 +51,9 @@ Prepare_Pick = 8
 Rotate = 9
 STOP = -99
 ERROR = -999
+###
+Place_raisin = 20
+Place_crayon = 21
 
 
 class FSM():
@@ -57,7 +64,7 @@ class FSM():
 
         self.last_state = STOP
         self.state = STOP
-        self.test_without_arm = True
+        self.test_without_arm = False
         self.last_img = 0
         self.last_depth = 0
         self.last_mask = 0
@@ -66,6 +73,7 @@ class FSM():
         self.cv_bridge = CvBridge()
         self.mani_req = manipulationRequest()
         self.rot = 0
+        self.object = ""
         self.start = rospy.Service("~start", Trigger, self.srv_start)
         self.start = rospy.Service("~barcode_start", Trigger, self.barcode_start)
         self.x_180 = np.array([[1, 0, 0],[0, -1, 0],[0, 0, -1]],dtype = np.float32)
@@ -86,6 +94,7 @@ class FSM():
         self.last_count = 0
         self.rot = 0
         self.last_list = []
+        self.object = ""
 
     def srv_start(self, req):
 
@@ -132,7 +141,7 @@ class FSM():
             upward_list = np.unique(self.cv_bridge.imgmsg_to_cv2(self.last_mask, "8UC1"))
             print "Brandname result: ", upward_list
             if len(upward_list) == 1:
-                self.state = Perception_obj
+                self.state = HOME   ### Perception_obj
                 self.last_count = 0
                 self.last_list = []
             else:
@@ -197,18 +206,18 @@ class FSM():
                     self.state = ERROR
                 else:
                     direct = recog_resp.ob_list[0].object / len(self.commodity_list)
-                    obj_name = self.commodity_list[recog_resp.ob_list[0].object % len(self.commodity_list)]
+                    self.object = self.commodity_list[recog_resp.ob_list[0].object % len(self.commodity_list)]
                     self.mani_req.mode = "BN"
-                    self.mani_req.object = obj_name
+                    self.mani_req.object = self.object
                     self.mani_req.pose = recog_resp.ob_list[0].pose
                     self.rot = direct
                     q_pose = Quaternion(self.mani_req.pose.orientation.w, self.mani_req.pose.orientation.x, self.mani_req.pose.orientation.y, self.mani_req.pose.orientation.z)
                     q_mat = q_pose.rotation_matrix 
                     rpy = rot_to_rpy(q_mat)
-                    print "old =====" ,rpy
+                    # print "old =====" ,rpy
                     inv = -1 if np.abs(rpy[0]) > math.pi/2 else 1
                     q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
-                    print "old222 =====" ,rot_to_rpy(q_new_mat)
+                    # print "old222 =====" ,rot_to_rpy(q_new_mat)
                     q_new_pose = Quaternion(matrix=q_new_mat)
                     self.mani_req.pose.orientation.w = q_new_pose.w
                     self.mani_req.pose.orientation.x = q_new_pose.x
@@ -216,7 +225,7 @@ class FSM():
                     self.mani_req.pose.orientation.z = q_new_pose.z  
                     self.pub_tf(self.mani_req.pose, "rectify_rot")
                     print self.mani_req.pose
-                    print "Picking object ", obj_name
+                    print "Picking object ", self.object
                     print "Direction ", str(direct*90)
                     if self.test_without_arm:
                         self.state = HOME
@@ -226,7 +235,32 @@ class FSM():
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
             return 
+##################################################################################################################
+        # if self.state == Place_raisin:
+        #     emp = TriggerRequest()
+        #     try:
+        #         rospy.wait_for_service(Raisin_srv, timeout=10)
+        #         raisin_srv = rospy.ServiceProxy(Raisin_srv, Trigger)
+        #         emp_resp = raisin_srv(emp)
+        #     except (rospy.ServiceException, rospy.ROSException), e:
+        #         print "Service call failed: %s"%e 
+        #     self.last_state = Place_raisin
+        #     self.state = HOME
+        #     return
 
+        # if self.state == Place_crayon:
+        #     emp = TriggerRequest()
+        #     try:
+        #         rospy.wait_for_service(Crayon_srv, timeout=10)
+        #         crayon_srv = rospy.ServiceProxy(Crayon_srv, Trigger)
+        #         emp_resp = crayon_srv(emp)
+        #     except (rospy.ServiceException, rospy.ROSException), e:
+        #         print "Service call failed: %s"%e 
+        #     self.last_state = Place_crayon
+        #     self.state = HOME
+        #     return
+
+##################################################################################################################
         if self.state == Prepare_Pick:
             if self.rot >= 2:
                 object_req = object_onlyRequest()
@@ -271,6 +305,10 @@ class FSM():
             self.gripper_off()
             if self.rot >= 2:
                 self.state = Rotate
+            # elif self.object == "raisins":
+            #     self.state = Place_raisin
+            # elif self.object == "crayons":
+            #     self.state = Place_crayon
             else: 
                 self.state = HOME
             self.last_state = pick_bn

@@ -2,7 +2,6 @@
 *.png
 *.jpg
 *.mat
-*.xml
 *.pdf
 *.csv
 *.pth

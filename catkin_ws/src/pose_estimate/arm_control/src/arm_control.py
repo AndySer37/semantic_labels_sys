@@ -30,7 +30,17 @@ Vacuum_state = "/vacuum_control/on"
 Home = [4.835045337677002, -1.5105884710894983, 1.8466014862060547, -1.875340763722555, -1.5207436720477503, 0.012231024913489819]
 Flip_down = [6.197889804840088, -1.2037904898272913, 2.085622787475586, -1.858868424092428, -2.9599974791156214, 0.5323190689086914]
 Flip_up = [6.190801620483398, -1.7303056875811976, 2.084195137023926, -1.858269993458883, -2.95280367532839, 0.5297435522079468]
+### Data science project
+Raisin_list = [[5.461093425750732, -1.5132268110858362, 1.5177922248840332, -1.5628412405597132, -1.5638211409198206, 0.7159885764122009],\
+            [5.447961807250977, -1.1255162397967737, 1.9375662803649902, -3.862631146107809, -2.182455841694967, 0.039460308849811554],\
+            [5.106770992279053, -0.8373449484454554, 1.717036247253418, -3.9966724554644983, -1.9069741407977503, 0.030188262462615967],\
+            [5.034962177276611, -0.6595209280597132, 1.3412714004516602, -3.799537960683004, -1.8350942770587366, 0.028259553015232086],\
+            [5.040513515472412, -0.6778886953936976, 1.3798398971557617, -3.8197696844684046, -1.8407357374774378, 0.028475267812609673]]
 
+Crayon_list = [[5.461093425750732, -1.5132268110858362, 1.5177922248840332, -1.5628412405597132, -1.5638211409198206, 0.7159885764122009],\
+            [5.447961807250977, -1.1255162397967737, 1.9375662803649902, -3.862631146107809, -2.182455841694967, 0.039460308849811554],\
+            [5.426207542419434, -0.6533506552325647, 1.3531436920166016, -3.847229305897848, -2.2398951689349573, 0.018783774226903915],\
+            [5.2929534912109375, -0.41357690492738897, 0.8479938507080078, -3.581275765095846, -2.106464211140768, 0.019646264612674713]]
 
 class arm_control(object):
     def __init__(self):
@@ -40,6 +50,11 @@ class arm_control(object):
         self.arm_home_srv = rospy.Service("~home", Trigger, self.srv_home)
         self.flip_srv = rospy.Service("~flip", Trigger, self.srv_flip)
         self.suck_process_srv = rospy.Service("~suck_process", Trigger, self.srv_suck)
+
+        ### Data science 
+        self.raisin = rospy.Service("~raisin", Trigger, self.srv_raisin)
+        self.raisin = rospy.Service("~crayon", Trigger, self.srv_crayon)
+
 
     def srv_move(self, req_mani):
 
@@ -127,6 +142,96 @@ class arm_control(object):
         suck(req)
         rospy.sleep(0.5)
 
+###################################################3
+    def srv_raisin(self, req_mani):
+
+        for joint in Raisin_list:
+            rospy.wait_for_service('/ur5_control_server/ur_control/goto_joint_pose')
+            try:
+                ur5_joint_ser = rospy.ServiceProxy('/ur5_control_server/ur_control/goto_joint_pose', joint_pose)
+                req = joint_poseRequest()
+                msg = joint_value()
+                for i in range(6):
+                    msg.joint_value[i] = joint[i]
+                req.joints.append(msg)
+                req.factor = 0.5
+                resp1 = ur5_joint_ser(req)
+            except rospy.ServiceException, e:
+                print "Service call failed: %s"%e
+
+            rospy.sleep(0.5)
+
+        rospy.sleep(0.5)
+        rospy.wait_for_service('/gripper_control/open')
+        try:
+            gripper_close_ser = rospy.ServiceProxy('/gripper_control/open', Empty)
+            req = EmptyRequest()
+            resp1 = gripper_close_ser(req)
+            rospy.sleep(1)
+
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e  
+
+        rospy.wait_for_service('/ur5_control_server/ur_control/goto_joint_pose')
+        try:
+            ur5_joint_ser = rospy.ServiceProxy('/ur5_control_server/ur_control/goto_joint_pose', joint_pose)
+            req = joint_poseRequest()
+            msg = joint_value()
+            for i in range(6):
+                msg.joint_value[i] = Raisin_list[2][i]
+            req.joints.append(msg)
+            req.factor = 0.5
+            resp1 = ur5_joint_ser(req)
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e    
+
+        return TriggerResponse(success=True, message="Request accepted.")
+
+    def srv_crayon(self, req_mani):
+
+        for joint in Crayon_list:
+            rospy.wait_for_service('/ur5_control_server/ur_control/goto_joint_pose')
+            try:
+                ur5_joint_ser = rospy.ServiceProxy('/ur5_control_server/ur_control/goto_joint_pose', joint_pose)
+                req = joint_poseRequest()
+                msg = joint_value()
+                for i in range(6):
+                    msg.joint_value[i] = joint[i]
+                req.joints.append(msg)
+                req.factor = 0.5
+                resp1 = ur5_joint_ser(req)
+            except rospy.ServiceException, e:
+                print "Service call failed: %s"%e
+
+            rospy.sleep(0.5)
+
+        rospy.sleep(0.5)
+        rospy.wait_for_service('/gripper_control/open')
+        try:
+            gripper_close_ser = rospy.ServiceProxy('/gripper_control/open', Empty)
+            req = EmptyRequest()
+            resp1 = gripper_close_ser(req)
+            rospy.sleep(1)
+
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e  
+
+        rospy.wait_for_service('/ur5_control_server/ur_control/goto_joint_pose')
+        try:
+            ur5_joint_ser = rospy.ServiceProxy('/ur5_control_server/ur_control/goto_joint_pose', joint_pose)
+            req = joint_poseRequest()
+            msg = joint_value()
+            for i in range(6):
+                msg.joint_value[i] = Crayon_list[2][i]
+            req.joints.append(msg)
+            req.factor = 0.5
+            resp1 = ur5_joint_ser(req)
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e    
+
+        return TriggerResponse(success=True, message="Request accepted.")
+
+######################################################################################################################
     def shutdown_cb(self):
         rospy.loginfo("Node shutdown")
 
