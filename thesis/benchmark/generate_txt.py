@@ -23,7 +23,7 @@ for root, dirs, files in walk(mypath):
 		if "mask" in fullpath and ".png" == fullpath[-4:]:#and "000014" in fullpath:
 			print fullpath
 			_t = []
-			_t.append(fullpath.replace("mask","images"))
+			_t.append(fullpath.replace("mask","images").replace("png","jpg"))
 			_t.append(fullpath[:])
 			# _t = []
 			# _t.append('/home/andyser/data/subt_real' + fullpath[1:])

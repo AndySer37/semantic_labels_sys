@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.nn.parameter import Parameter
 from models.fracPickup import fracPickup
+from .senet.se_resnet import *
 
 class BidirectionalLSTM(nn.Module):
 
@@ -183,6 +184,45 @@ class Residual_block(nn.Module):
             residual = self.downsample(residual)
         return self.relu(residual + conv2)
 
+
+########### SAGAN Attention cell ################
+class Self_Attn(nn.Module):
+    """ Self attention Layer"""
+    def __init__(self,in_dim,activation):
+        super(Self_Attn,self).__init__()
+        self.chanel_in = in_dim
+        self.activation = activation
+        
+        self.query_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//8 , kernel_size= 1)
+        self.key_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//8 , kernel_size= 1)
+        self.value_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim , kernel_size= 1)
+        self.gamma = nn.Parameter(torch.zeros(1))
+
+        self.softmax  = nn.Softmax(dim=-1) #
+    def forward(self,x):
+        """
+            inputs :
+                x : input feature maps( B X C X W X H)
+            returns :
+                out : self attention value + input feature 
+                attention: B X N X N (N is Width*Height)
+        """
+        m_batchsize,C,width ,height = x.size()
+        proj_query  = self.query_conv(x).view(m_batchsize,-1,width*height).permute(0,2,1) # B X CX(N)
+        proj_key =  self.key_conv(x).view(m_batchsize,-1,width*height) # B X C x (*W*H)
+        energy =  torch.bmm(proj_query,proj_key) # transpose check
+        attention = self.softmax(energy) # BX (N) X (N) 
+        proj_value = self.value_conv(x).view(m_batchsize,-1,width*height) # B X C X N
+
+        out = torch.bmm(proj_value,attention.permute(0,2,1) )
+        out = out.view(m_batchsize,C,width,height)
+        
+        out = self.gamma*out + x
+        # print (self.gamma)
+        return out,attention
+
+##################################################
+
 class ResNet(nn.Module):
     def __init__(self,c_in):
         super(ResNet,self).__init__()
@@ -193,6 +233,9 @@ class ResNet(nn.Module):
         self.block4 = self._make_layer(128, 256, (2,1), 6)
         self.block5 = self._make_layer(256, 512, (2,1), 3)
 
+        # self.attn1 = Self_Attn( 128, 'relu')
+        # self.attn2 = Self_Attn( 256, 'relu')
+
     def _make_layer(self,c_in,c_out,stride,repeat=3):
         layers = []
         layers.append(Residual_block(c_in, c_out, stride))
@@ -201,21 +244,80 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self,x):
-        block0 = self.block0(x)
-        block1 = self.block1(block0)
-        block2 = self.block2(block1)
-        block3 = self.block3(block2)
-        block4 = self.block4(block3)
-        block5 = self.block5(block4)
+                                            # torch.Size([30, 1, 32, 100])
+        block0 = self.block0(x)             # torch.Size([30, 32, 32, 100]) 
+        block1 = self.block1(block0)        # torch.Size([30, 32, 16, 50]) 
+        block2 = self.block2(block1)        # torch.Size([30, 64, 8, 25]) 
+        block3 = self.block3(block2)        # torch.Size([30, 128, 4, 25]) 
+        # block3, p1 = self.attn1(block3)
+        block4 = self.block4(block3)        # torch.Size([30, 256, 2, 25]) 
+        # block4, p2 = self.attn2(block4)
+        block5 = self.block5(block4)        # torch.Size([30, 512, 1, 25])
         return block5
+
+############## SEnet ##################
+# class SE_ResNet(nn.Module):
+#     def __init__(self, block, n_size, num_classes=10, reduction=16):
+#         super(CifarSEResNet, self).__init__()
+#         self.inplane = 16
+#         self.conv1 = nn.Conv2d(
+#             3, self.inplane, kernel_size=3, stride=1, padding=1, bias=False)
+#         self.bn1 = nn.BatchNorm2d(self.inplane)
+#         self.relu = nn.ReLU(inplace=True)
+#         self.layer1 = self._make_layer(
+#             block, 16, blocks=n_size, stride=1, reduction=reduction)
+#         self.layer2 = self._make_layer(
+#             block, 32, blocks=n_size, stride=2, reduction=reduction)
+#         self.layer3 = self._make_layer(
+#             block, 64, blocks=n_size, stride=2, reduction=reduction)
+#         self.avgpool = nn.AdaptiveAvgPool2d(1)
+#         self.fc = nn.Linear(64, num_classes)
+#         self.initialize()
+
+#     def initialize(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Conv2d):
+#                 nn.init.kaiming_normal_(m.weight)
+#             elif isinstance(m, nn.BatchNorm2d):
+#                 nn.init.constant_(m.weight, 1)
+#                 nn.init.constant_(m.bias, 0)
+
+#     def _make_layer(self, block, planes, blocks, stride, reduction):
+#         strides = [stride] + [1] * (blocks - 1)
+#         layers = []
+#         for stride in strides:
+#             layers.append(block(self.inplane, planes, stride, reduction))
+#             self.inplane = planes
+
+#         return nn.Sequential(*layers)
+
+#     def forward(self, x):
+#         x = self.conv1(x)
+#         x = self.bn1(x)
+#         x = self.relu(x)
+
+#         x = self.layer1(x)
+#         x = self.layer2(x)
+#         x = self.layer3(x)
+
+#         x = self.avgpool(x)
+#         x = x.view(x.size(0), -1)
+#         x = self.fc(x)
+
+#         return x
+
+##########################################
 
 class ASRN(nn.Module):
 
-    def __init__(self, imgH, nc, nclass, nh, BidirDecoder=False, CUDA=True):
+    def __init__(self, network, imgH, nc, nclass, nh, BidirDecoder=False, CUDA=True):
         super(ASRN, self).__init__()
         assert imgH % 16 == 0, 'imgH must be a multiple of 16'
 
-        self.cnn = ResNet(nc) 
+        if network == "origin":
+            self.cnn = ResNet(nc) 
+        elif network == "senet":
+            self.cnn = CifarSEResNet(CifarSEBasicBlock, 3) 
 
         self.rnn = nn.Sequential(
             BidirectionalLSTM(512, nh, nh),

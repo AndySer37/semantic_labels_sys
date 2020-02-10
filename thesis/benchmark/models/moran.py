@@ -4,11 +4,11 @@ from models.asrn_res import ASRN
 
 class MORAN(nn.Module):
 
-    def __init__(self, nc, nclass, nh, targetH, targetW, BidirDecoder=False, 
+    def __init__(self, nc, nclass, nh, targetH, targetW, network='origin', BidirDecoder=False, 
     	inputDataType='torch.cuda.FloatTensor', maxBatch=256, CUDA=True):
         super(MORAN, self).__init__()
         self.MORN = MORN(nc, targetH, targetW, inputDataType, maxBatch, CUDA)
-        self.ASRN = ASRN(targetH, nc, nclass, nh, BidirDecoder, CUDA)
+        self.ASRN = ASRN(network, targetH, nc, nclass, nh, BidirDecoder, CUDA)
 
     def forward(self, x, length, text, text_rev, test=False, debug=False):
         if debug:
