@@ -22,6 +22,9 @@ class vacuum_control(object):
             self.blow = rospy.Service("~blow", Empty, self.blow_ser)
             self.normal = rospy.Service("~normal", Empty, self.narmal_ser)
             self.weak_blow = rospy.Service("~weak_blow", Empty, self.weak_blow_ser) 
+            ### Conveyor 
+            self.Conveyor_start = rospy.Service("~conveyor_start", Empty, self.conveyor_start)
+
             rospy.loginfo("Vacuum Node Ready for port: {}, baudrate: {}.".format(port, baud))
         except (rospy.ServiceException, rospy.ROSException, serial.SerialException), e:
             rospy.logerr("Could not connect to vacuum system.")
@@ -62,6 +65,13 @@ class vacuum_control(object):
 
         rospy.loginfo("Vacuun status: weak blow")
         self.serial.write('v3')
+        return EmptyResponse()
+
+    def conveyor_start(self, req):
+        self.serial.write('c1')
+        rospy.loginfo("Conveyor status: Start")
+        rospy.sleep(0.5)
+        self.serial.write('c0')
         return EmptyResponse()
 
     def onShutdown(self):

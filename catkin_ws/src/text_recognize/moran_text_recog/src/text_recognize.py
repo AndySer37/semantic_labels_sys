@@ -200,7 +200,11 @@ class text_recognize(object):
 			if sim_preds in self.commodity_list:
 				cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), self.color_map[rot], 3)
 				cv2.putText(img, sim_preds, (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 255, 255),3)
-				cv2.fillConvexPoly(mask, _cont, self.commodity_list.index(sim_preds) + rot*len(self.commodity_list))
+				pix = self.commodity_list.index(sim_preds) + rot*len(self.commodity_list)
+				if pix in np.unique(mask):
+					cv2.fillConvexPoly(mask, _cont, pix + 4*len(self.commodity_list))
+				else:
+					cv2.fillConvexPoly(mask, _cont, pix)
 			else:
 				correct, conf, _bool = self.conf_of_word(sim_preds)
 
@@ -208,8 +212,11 @@ class text_recognize(object):
 				if _bool:
 					cv2.putText(img, correct + "{:.2f}".format(conf), (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 255, 255),3)
 					cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (255, 255, 255), 2)
-					cv2.fillConvexPoly(mask, _cont, self.commodity_list.index(correct) + rot*len(self.commodity_list))
-
+					pix = self.commodity_list.index(correct) + rot*len(self.commodity_list)
+					if pix in np.unique(mask):
+						cv2.fillConvexPoly(mask, _cont, pix + 4*len(self.commodity_list))
+					else:
+						cv2.fillConvexPoly(mask, _cont, pix)
 				# else:
 				# 	cv2.putText(img, sim_preds, (text_bb.box.xmin, text_bb.box.ymin), 0, 1, (0, 0, 0),3)
 				# 	cv2.rectangle(img, (text_bb.box.xmin, text_bb.box.ymin),(text_bb.box.xmax, text_bb.box.ymax), (0, 0, 0), 2)					
@@ -218,6 +225,9 @@ class text_recognize(object):
 
 	def conf_of_word(self, target):
 		### Edit distance
+		# print target
+
+		_recheck = False
 		total = np.zeros(len(self.commodity_list))
 		for i in range(1, len(self.commodity_list)):
 			size_x = len(self.commodity_list[i]) + 1
@@ -244,6 +254,51 @@ class text_recognize(object):
 						)
 			# print (matrix)
 			total[i] = (size_x - matrix[size_x-1, size_y-1]) / float(size_x)
+			
+			if self.commodity_list[i] == "kleenex" and 0.3 < total[i] < 0.77:
+				_list = ["kloonex", "kloonox","kleeper", "killer", "kleem",  "kleers", "kluting", "klates",\
+					"kleams", "kreamer", "klea", "kleas", "kletter","keenier","vooney", "wooner", "whonex"]
+				_recheck = True
+			elif self.commodity_list[i] == "andes" and 0.3 < total[i] < 0.77:
+				_list = ["anders", "findes","windes"]  # "andor", 
+				_recheck = True
+			elif self.commodity_list[i] == "vanish" and 0.3 < total[i] < 0.77:
+				_list = ["varish"]
+				_recheck = True
+			if _recheck == True:
+				
+				for _str in _list:
+					size_x = len(_str) + 1
+					size_y = len(target) + 1
+					matrix = np.zeros ((size_x, size_y))
+					for x in xrange(size_x):
+						matrix [x, 0] = x
+					for y in xrange(size_y):
+						matrix [0, y] = y
+
+					for x in xrange(1, size_x):
+						for y in xrange(1, size_y):
+							if _str[x-1] == target[y-1]:
+								matrix [x,y] = min(
+									matrix[x-1, y] + 1,
+									matrix[x-1, y-1],
+									matrix[x, y-1] + 1
+								)
+							else:
+								matrix [x,y] = min(
+									matrix[x-1,y] + 1,
+									matrix[x-1,y-1] + 1,
+									matrix[x,y-1] + 1
+								)
+					score_temp = (size_x - matrix[size_x-1, size_y-1]) / float(size_x)
+					if total[i] < score_temp:
+						total[i] = score_temp
+				if 0.77 > total[i] > 0.68:
+					total[i] = 0.77
+				_recheck = False
+				
+				# print target, total[i], self.commodity_list[i]
+
 		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) >= 0.77   ## 0.66		
 
 

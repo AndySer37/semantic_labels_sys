@@ -73,6 +73,14 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 			}  
 		} 
 		pcl::transformPointCloud(*input, *process, eigen_tf);
+		
+		pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond1 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
+		range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, lower_bound)));
+		range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, upper_bound)));
+		pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem1;
+		condrem1.setCondition(range_cond1);
+		condrem1.setInputCloud(process);
+		condrem1.filter(*process);
 
 		// downsample the pc
 		downsample.setInputCloud (process);
@@ -262,6 +270,9 @@ bn_pose_node::bn_pose_node(){
 
 	target = "base_link";  // base_link
 	source = "camera_color_frame";
+
+	lower_bound = 0.022;
+	upper_bound = 0.16;
 
 	input.reset(new PointCloud<PointXYZRGB>()); 
 	output.reset(new PointCloud<PointXYZRGB>());

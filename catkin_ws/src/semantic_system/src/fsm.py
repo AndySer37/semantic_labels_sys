@@ -60,6 +60,7 @@ class FSM():
     def __init__(self):
         r = rospkg.RosPack()
         self.commodity_list = []
+        self.shelf_list = []
         self.read_commodity(r.get_path('text_msgs') + "/config/commodity_list.txt")
 
         self.last_state = STOP
@@ -75,7 +76,8 @@ class FSM():
         self.rot = 0
         self.object = ""
         self.start = rospy.Service("~start", Trigger, self.srv_start)
-        self.start = rospy.Service("~barcode_start", Trigger, self.barcode_start)
+        self.reset_shelf = rospy.Service("~reset_shelf", Trigger, self.reset_shelf)
+        self.start_bar = rospy.Service("~barcode_start", Trigger, self.barcode_start)
         self.x_180 = np.array([[1, 0, 0],[0, -1, 0],[0, 0, -1]],dtype = np.float32)
         self.x_90 = np.array([[1, 0, 0],[0, 0, -1],[0, 1, 0]],dtype = np.float32)
 
@@ -100,6 +102,11 @@ class FSM():
 
         self.state = Initial
         self.last_state = Initial
+        return TriggerResponse(success=True, message="Request accepted.")
+
+    def reset_shelf(self, req):
+
+        self.shelf_list = []
         return TriggerResponse(success=True, message="Request accepted.")
 
     def process(self):
@@ -217,6 +224,8 @@ class FSM():
                     # print "old =====" ,rpy
                     inv = -1 if np.abs(rpy[0]) > math.pi/2 else 1
                     q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
+                    if self.rot >= 2:
+                        q_new_mat = np.dot(q_new_mat, rpy_to_rot([math.pi, 0, 0]))
                     # print "old222 =====" ,rot_to_rpy(q_new_mat)
                     q_new_pose = Quaternion(matrix=q_new_mat)
                     self.mani_req.pose.orientation.w = q_new_pose.w
@@ -262,19 +271,6 @@ class FSM():
 
 ##################################################################################################################
         if self.state == Prepare_Pick:
-            if self.rot >= 2:
-                object_req = object_onlyRequest()
-                rospy.wait_for_service(Object_Pose_SRV, timeout=10)
-                object_req.image = self.last_img
-                object_req.depth = self.last_depth
-                object_pose_srv = rospy.ServiceProxy(Object_Pose_SRV, object_only)
-                recog_resp = object_pose_srv(object_req)
-                if len(recog_resp.ob_list) > 0:
-                    self.mani_req.pose = recog_resp.ob_list[0].pose
-                else:
-                    self.state = ERROR
-                    print "Can't find object pose !"
-                    return
 
             self.mani_req.pose.position.z += 0.06
             try:
@@ -373,7 +369,7 @@ class FSM():
             if self.last_state == pick_bn:
                 self.gripper_open()
                 self.state = STOP
-            elif self.last_state == FLIP or Rotate:
+            elif self.last_state == FLIP or self.last_state == Rotate or self.test_without_arm:
                 self.state = Perception_bn
             else:
                 self.gripper_open()

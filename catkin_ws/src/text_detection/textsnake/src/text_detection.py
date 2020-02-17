@@ -263,7 +263,7 @@ class text_detection(object):
 		print _list
 		for i in _list:			# self.commodity_list
 			obj = i % obj_num
-			direct = int(i / obj_num)
+			direct = int(i / obj_num) % 4
 			if obj != 0:
 				mask_i = mask.copy()
 				mask_i[mask_i != i] = 0
