@@ -82,6 +82,18 @@ bool bn_pose_node::serviceCb(text_msgs::bn_pose_srv::Request &req, text_msgs::bn
 		condrem1.setInputCloud(process);
 		condrem1.filter(*process);
 
+		pcl::PointXYZRGB minPt_filter, maxPt_filter;
+		pcl::getMinMax3D (*process, minPt_filter, maxPt_filter);
+		std::cout << "Max z: " << maxPt_filter.z << std::endl;
+
+		pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond2 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
+		range_cond2->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, maxPt_filter.z - z_range)));
+		range_cond2->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, maxPt_filter.z + z_range)));
+		pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem2;
+		condrem2.setCondition(range_cond2);
+		condrem2.setInputCloud(process);
+		condrem2.filter(*process);
+
 		// downsample the pc
 		downsample.setInputCloud (process);
 		downsample.filter (*process);
@@ -273,7 +285,7 @@ bn_pose_node::bn_pose_node(){
 
 	lower_bound = 0.022;
 	upper_bound = 0.16;
-
+	z_range = 0.008;
 	input.reset(new PointCloud<PointXYZRGB>()); 
 	output.reset(new PointCloud<PointXYZRGB>());
 	process.reset(new PointCloud<PointXYZRGB>());

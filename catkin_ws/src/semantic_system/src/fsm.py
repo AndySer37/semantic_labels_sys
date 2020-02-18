@@ -60,7 +60,12 @@ Place_crayon = 21
 
 ### commodity_list
 ### background crayons kleenex vanish milo raisins andes pocky lays hunts 3m
-OBJ_HEIGHT = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+OBJ_HEIGHT = [0.0, -0.038, -0.005, 0.0, 0.005, -0.03, -0.02, 0.045, 0.103, 0.01, 0.115]
+Y_DIS = 0.23
+OBJ_Depth = [0.0, 0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.0, -0.02, -0.02, -0.025]
+
+### Static Joint
+PrePare_Place = [5.506424903869629, -1.7503469626056116, 1.9935364723205566, -1.8246658484088343, -1.5188863913165491, 0.6822109818458557]
 
 class FSM():
     def __init__(self):
@@ -68,7 +73,8 @@ class FSM():
         self.commodity_list = []
         self.shelf_list = []
         self.read_commodity(r.get_path('text_msgs') + "/config/commodity_list.txt")
-
+        self.repeat_bn_detect = 5
+        self.bn_detect_count = 0
         self.last_state = STOP
         self.state = STOP
         self.test_without_arm = False
@@ -88,7 +94,7 @@ class FSM():
         self.x_90 = np.array([[1, 0, 0],[0, 0, -1],[0, 1, 0]],dtype = np.float32)
 
         self.shelf_pose = Pose()
-        self.shelf_pose.position.x = 0.139651686266; self.shelf_pose.position.y = -0.424602086405; self.shelf_pose.position.z = 0.424965406054
+        self.shelf_pose.position.x = 0.139651686266; self.shelf_pose.position.y = -0.384602086405; self.shelf_pose.position.z = 0.424965406054
         self.shelf_pose.orientation.x = 0.0038249214696; self.shelf_pose.orientation.y = -0.00640644391886
         self.shelf_pose.orientation.z = -0.68676603623; self.shelf_pose.orientation.w = 0.726840243061
         self.shelf_count = 0
@@ -108,7 +114,7 @@ class FSM():
             print "Service call failed: %s"%e
         rospy.sleep(0.3)
 
-        temp_mani_req.pose.position.y -= 0.19
+        temp_mani_req.pose.position.y -= Y_DIS
         try:
             rospy.wait_for_service(Move_srv, timeout=10)
             mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -117,7 +123,7 @@ class FSM():
             print "Service call failed: %s"%e
         rospy.sleep(0.3)
 
-        temp_mani_req.pose.position.y += 0.19
+        temp_mani_req.pose.position.y += Y_DIS
         try:
             rospy.wait_for_service(Move_srv, timeout=10)
             mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -143,6 +149,7 @@ class FSM():
         self.last_mask = 0
         self.last_count = 0
         self.rot = 0
+        self.bn_detect_count = 0
         self.last_list = []
         self.object = ""
 
@@ -176,12 +183,12 @@ class FSM():
 
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
-
+            self.initial()
             self.state = Perception_bn
             return 
 
         if self.state == Perception_bn:
-            self.initial()
+            self.bn_detect_count += 1
             rospy.wait_for_service(Detect_SRV)
             try:
                 perception_bn_ser = rospy.ServiceProxy(Detect_SRV, text_detection_srv)
@@ -195,11 +202,12 @@ class FSM():
 
             upward_list = np.unique(self.cv_bridge.imgmsg_to_cv2(self.last_mask, "8UC1"))
             print "Brandname result: ", upward_list
-            if len(upward_list) == 1:
+            if len(upward_list) == 1 and self.bn_detect_count >= self.repeat_bn_detect:
                 self.state = HOME   ### Perception_obj
                 self.last_count = 0
                 self.last_list = []
-            else:
+            elif len(upward_list) > 1:
+                self.bn_detect_count = 0
                 self.state = pose_bn
                 self.last_count = len(upward_list) - 1
                 self.last_list = upward_list
@@ -339,6 +347,7 @@ class FSM():
             return              
 
         if self.state == pick_bn:  
+            self.mani_req.pose.position.z += OBJ_Depth[self.commodity_list.index(self.object)]
             try:
                 rospy.wait_for_service(Move_srv, timeout=10)
                 mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -368,7 +377,21 @@ class FSM():
                 else:
                     addr = len(self.shelf_list)
                     self.shelf_list.append(self.object)
+
+                rospy.wait_for_service(Goto_joint)
+                try:
+                    ur5_joint_ser = rospy.ServiceProxy(Goto_joint, joint_pose)
+                    req = joint_poseRequest()
+                    msg = joint_value()
+                    for i in range(6):
+                        msg.joint_value[i] = PrePare_Place[i]
+                    req.joints.append(msg)
+                    req.factor = 0.5
+                    resp1 = ur5_joint_ser(req)
+                except rospy.ServiceException, e:
+                    print "Service call failed: %s"%e
                 temp_mani_req = manipulationRequest()
+
                 temp_mani_req.pose = copy.deepcopy(self.shelf_pose)
                 temp_mani_req.pose.position.x += (addr * 0.11)
                 temp_mani_req.pose.position.z += OBJ_HEIGHT[self.commodity_list.index(self.object)]
@@ -380,7 +403,7 @@ class FSM():
                     print "Service call failed: %s"%e
                 rospy.sleep(0.3)
 
-                temp_mani_req.pose.position.y -= 0.19
+                temp_mani_req.pose.position.y -= Y_DIS
                 try:
                     rospy.wait_for_service(Move_srv, timeout=10)
                     mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -389,7 +412,7 @@ class FSM():
                     print "Service call failed: %s"%e
                 rospy.sleep(0.3)
                 self.gripper_open()
-                temp_mani_req.pose.position.y += 0.19
+                temp_mani_req.pose.position.y += Y_DIS
                 try:
                     rospy.wait_for_service(Move_srv, timeout=10)
                     mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
