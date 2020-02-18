@@ -12,10 +12,12 @@ from std_srvs.srv import Trigger, TriggerResponse,TriggerRequest, Empty, EmptyRe
 from arm_operation.srv import *
 from arm_operation.msg import *
 from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Pose
 import rospkg
 from cv_bridge import CvBridge, CvBridgeError
 from pyquaternion import Quaternion 
 from converter import  *
+import copy
 
 Initial_gripper = '/gripper_control/initial'
 Detect_SRV = "/text_detection/text_detection"
@@ -49,12 +51,16 @@ FLIP = 6
 HOME = 7
 Prepare_Pick = 8
 Rotate = 9
+Place_On_Shelf = 10
 STOP = -99
 ERROR = -999
 ###
 Place_raisin = 20
 Place_crayon = 21
 
+### commodity_list
+### background crayons kleenex vanish milo raisins andes pocky lays hunts 3m
+OBJ_HEIGHT = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 class FSM():
     def __init__(self):
@@ -81,6 +87,48 @@ class FSM():
         self.x_180 = np.array([[1, 0, 0],[0, -1, 0],[0, 0, -1]],dtype = np.float32)
         self.x_90 = np.array([[1, 0, 0],[0, 0, -1],[0, 1, 0]],dtype = np.float32)
 
+        self.shelf_pose = Pose()
+        self.shelf_pose.position.x = 0.139651686266; self.shelf_pose.position.y = -0.424602086405; self.shelf_pose.position.z = 0.424965406054
+        self.shelf_pose.orientation.x = 0.0038249214696; self.shelf_pose.orientation.y = -0.00640644391886
+        self.shelf_pose.orientation.z = -0.68676603623; self.shelf_pose.orientation.w = 0.726840243061
+        self.shelf_count = 0
+
+        self.place_shelf_test = rospy.Service("~test_arm_place_shelf", Trigger, self.test_arm)
+
+    def test_arm(self, req):
+
+        temp_mani_req = manipulationRequest()
+        temp_mani_req.pose = copy.deepcopy(self.shelf_pose)
+        temp_mani_req.pose.position.x += (self.shelf_count * 0.11)
+        try:
+            rospy.wait_for_service(Move_srv, timeout=10)
+            mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+            mani_resp = mani_move_srv(temp_mani_req)
+        except (rospy.ServiceException, rospy.ROSException), e:
+            print "Service call failed: %s"%e
+        rospy.sleep(0.3)
+
+        temp_mani_req.pose.position.y -= 0.19
+        try:
+            rospy.wait_for_service(Move_srv, timeout=10)
+            mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+            mani_resp = mani_move_srv(temp_mani_req)
+        except (rospy.ServiceException, rospy.ROSException), e:
+            print "Service call failed: %s"%e
+        rospy.sleep(0.3)
+
+        temp_mani_req.pose.position.y += 0.19
+        try:
+            rospy.wait_for_service(Move_srv, timeout=10)
+            mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+            mani_resp = mani_move_srv(temp_mani_req)
+        except (rospy.ServiceException, rospy.ROSException), e:
+            print "Service call failed: %s"%e
+        rospy.sleep(0.3)
+
+        self.shelf_count += 1
+        return TriggerResponse(success=True, message="Request accepted.")
+
     def read_commodity(self, path):
 
         for line in open(path, "r"):
@@ -105,7 +153,7 @@ class FSM():
         return TriggerResponse(success=True, message="Request accepted.")
 
     def reset_shelf(self, req):
-
+        self.shelf_count = 0
         self.shelf_list = []
         return TriggerResponse(success=True, message="Request accepted.")
 
@@ -271,7 +319,7 @@ class FSM():
 
 ##################################################################################################################
         if self.state == Prepare_Pick:
-
+            
             self.mani_req.pose.position.z += 0.06
             try:
                 rospy.wait_for_service(Move_srv, timeout=10)
@@ -306,9 +354,52 @@ class FSM():
             # elif self.object == "crayons":
             #     self.state = Place_crayon
             else: 
-                self.state = HOME
+                self.state = Place_On_Shelf
             self.last_state = pick_bn
             return       
+
+        if self.state == Place_On_Shelf:
+            if len(self.shelf_list) > 5:
+                rospy.loginfo("Shelf is out of room!")
+                # self.state = HOME
+            else:
+                if self.object in self.shelf_list:
+                    addr = self.shelf_list.index(self.object)
+                else:
+                    addr = len(self.shelf_list)
+                    self.shelf_list.append(self.object)
+                temp_mani_req = manipulationRequest()
+                temp_mani_req.pose = copy.deepcopy(self.shelf_pose)
+                temp_mani_req.pose.position.x += (addr * 0.11)
+                temp_mani_req.pose.position.z += OBJ_HEIGHT[self.commodity_list.index(self.object)]
+                try:
+                    rospy.wait_for_service(Move_srv, timeout=10)
+                    mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+                    mani_resp = mani_move_srv(temp_mani_req)
+                except (rospy.ServiceException, rospy.ROSException), e:
+                    print "Service call failed: %s"%e
+                rospy.sleep(0.3)
+
+                temp_mani_req.pose.position.y -= 0.19
+                try:
+                    rospy.wait_for_service(Move_srv, timeout=10)
+                    mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+                    mani_resp = mani_move_srv(temp_mani_req)
+                except (rospy.ServiceException, rospy.ROSException), e:
+                    print "Service call failed: %s"%e
+                rospy.sleep(0.3)
+                self.gripper_open()
+                temp_mani_req.pose.position.y += 0.19
+                try:
+                    rospy.wait_for_service(Move_srv, timeout=10)
+                    mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
+                    mani_resp = mani_move_srv(temp_mani_req)
+                except (rospy.ServiceException, rospy.ROSException), e:
+                    print "Service call failed: %s"%e
+                rospy.sleep(0.3)
+                
+            self.state = HOME
+            self.last_state = Place_On_Shelf
 
         if self.state == Rotate:
             self.rotation()
@@ -443,7 +534,7 @@ class FSM():
             print "Service call failed: %s"%e       
 
     def gripper_open(self):
-        rospy.sleep(1.5)
+        # rospy.sleep(1.5)
         rospy.wait_for_service('/gripper_control/open')
         try:
             gripper_close_ser = rospy.ServiceProxy('/gripper_control/open', Empty)
