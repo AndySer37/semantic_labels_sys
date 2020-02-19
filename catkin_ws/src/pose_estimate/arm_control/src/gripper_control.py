@@ -42,7 +42,7 @@ class gripper_control(object):
             reset()
         except:
             print "Reset error"
-        rospy.sleep(1)
+        rospy.sleep(0.5)
         rospy.loginfo("Initial gripper!")
         msg = Robotiq2FGripper_robot_output()       
         msg.rACT = 1; msg.rGTO = 1; msg.rSP = 200; msg.rFR = 100

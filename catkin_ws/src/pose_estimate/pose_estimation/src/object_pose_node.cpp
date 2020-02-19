@@ -9,7 +9,6 @@ void object_pose_node::getXYZ(float* a, float* b,float zc){
 	return;
 }
 
-// 5.962156, -1.6593626, 1.385752, -1.284763, -1.4621570, 0.133269459
 bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs::object_only::Response &res){
 	res.count = 0;
 
@@ -46,32 +45,18 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	// Transfrom from camera to base
 	pcl::transformPointCloud(*input, *input, eigen_tf);
 
+	// downsample the pc
+	downsample.setInputCloud (input);
+	downsample.filter (*process);
 
 	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond1 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
 	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, lower_bound)));
 	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, upper_bound)));
 	pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem1;
 	condrem1.setCondition(range_cond1);
-	condrem1.setInputCloud(input);
+	condrem1.setInputCloud(process);
 	condrem1.filter(*process);
 
-	pcl::PointXYZRGB minPt, maxPt;
-	pcl::getMinMax3D (*process, minPt, maxPt);
-	std::cout << "Max z: " << maxPt.z << std::endl;
-
-	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond2 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
-	range_cond2->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, maxPt.z - z_range)));
-	range_cond2->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, maxPt.z + z_range)));
-	pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem2;
-	condrem2.setCondition(range_cond2);
-	condrem2.setInputCloud(process);
-	condrem2.filter(*process);
-
-
-	// downsample the pc
-
-	downsample.setInputCloud (process);
-	downsample.filter (*process);
 
 	sensor_msgs::PointCloud2 object_cloud_msg;
 	toROSMsg(*process, object_cloud_msg);
@@ -92,6 +77,18 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr p(new pcl::PointCloud<pcl::PointXYZRGB>);
 		*p = cluster;
 		*output += cluster;
+
+		pcl::PointXYZRGB minPt_height, maxPt_height;
+		pcl::getMinMax3D (*p, minPt_height, maxPt_height);
+		std::cout << "Max z: " << maxPt_height.z << std::endl;
+		pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond2 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
+		range_cond2->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, maxPt_height.z - z_range)));
+		range_cond2->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, maxPt_height.z + z_range)));
+		pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem2;
+		condrem2.setCondition(range_cond2);
+		condrem2.setInputCloud(p);
+		condrem2.filter(*p);
+
 		cout << "Cluster " << i << " with " << cluster_indices[i].indices.size() << " points\n";
 
 		//// Visual bbox
