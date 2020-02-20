@@ -29,8 +29,8 @@ Vacuum_state = "/vacuum_control/on"
 ## Static Cam
 # Home = [4.835045337677002, -1.5105884710894983, 1.8466014862060547, -1.875340763722555, -1.5207436720477503, 0.012231024913489819]
 Home = [4.886427879333496, -2.0365431944476526, 2.2552342414855957, -1.7605608145343226, -1.5193060080157679, 0.0639343410730362]
-Flip_down = [6.197889804840088, -1.2037904898272913, 2.085622787475586, -1.858868424092428, -2.9599974791156214, 0.5323190689086914]
-Flip_up = [6.190801620483398, -1.7303056875811976, 2.084195137023926, -1.858269993458883, -2.95280367532839, 0.5297435522079468]
+Flip_down = [6.27236795425415, -1.0761497656451624, 1.9012975692749023, -0.6618846098529261, 3.1246695518493652, 1.7635210752487183]
+Flip_up = [6.272356033325195, -1.3034032026873987, 1.7391934394836426, -0.2726700941668909, 3.1246814727783203, 1.7634971141815186]
 
 
 ### Data science project
@@ -52,6 +52,7 @@ class arm_control(object):
         self.arm_move_srv = rospy.Service("~move_to", manipulation, self.srv_move)
         self.arm_home_srv = rospy.Service("~home", Trigger, self.srv_home)
         self.flip_srv = rospy.Service("~flip", Trigger, self.srv_flip)
+        self.toss_srv = rospy.Service("~toss", Trigger, self.srv_toss)
         self.suck_process_srv = rospy.Service("~suck_process", Trigger, self.srv_suck)
 
         ### Data science 
@@ -66,7 +67,7 @@ class arm_control(object):
             ur5_pose_ser = rospy.ServiceProxy('/ur5_control_server/ur_control/goto_pose', target_pose)
             req = target_poseRequest()
             req.target_pose = req_mani.pose
-            req.factor = 0.5
+            req.factor = 0.6
             resp1 = ur5_pose_ser(req)
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
@@ -81,7 +82,7 @@ class arm_control(object):
             for i in range(6):
                 msg.joint_value[i] = Home[i]
             req.joints.append(msg)
-            req.factor = 0.5
+            req.factor = 0.75
             resp1 = ur5_joint_ser(req)
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
@@ -91,11 +92,17 @@ class arm_control(object):
 
     def srv_flip(self, req):
         self.joint_func(Flip_up)
-        rospy.sleep(1.0)
+        rospy.sleep(0.1)
         self.joint_func(Flip_down)
-        rospy.sleep(1.0)
+        rospy.sleep(0.1)
         self.suck_release()
         self.joint_func(Flip_up)
+        return TriggerResponse(success=True, message="Request accepted.")
+    
+    def srv_toss(self, req):
+        self.joint_func(Flip_up)
+        rospy.sleep(0.1)
+        self.suck_release()
         return TriggerResponse(success=True, message="Request accepted.")
 
     def srv_suck(self, req):
@@ -113,7 +120,7 @@ class arm_control(object):
             for i in range(6):
                 msg.joint_value[i] = joint[i]
             req.joints.append(msg)
-            req.factor = 0.5
+            req.factor = 0.7
             resp1 = ur5_joint_ser(req)
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
@@ -124,26 +131,26 @@ class arm_control(object):
         release_obj = rospy.ServiceProxy(Release_srv, Empty)
         req = EmptyRequest()
         release_obj(req)
-        rospy.sleep(0.5)
+        rospy.sleep(0.12)
         rospy.wait_for_service(Gripper_state, timeout=10)
         two_finger_srv = rospy.ServiceProxy(Gripper_state, Empty)
         two_finger_srv(req)
-        rospy.sleep(0.5)
+        rospy.sleep(0.3)
         rospy.wait_for_service(Normal_srv, timeout=10)
         normal = rospy.ServiceProxy(Normal_srv, Empty)
         normal(req)
-        rospy.sleep(0.5)
+        rospy.sleep(0.3)
 
     def suck_func(self):
         rospy.wait_for_service(Vacuum_state, timeout=10)
         vacuum_on = rospy.ServiceProxy(Vacuum_state, Empty)
         req = EmptyRequest()
         vacuum_on(req)
-        rospy.sleep(0.5)
+        rospy.sleep(0.3)
         rospy.wait_for_service(Suck_srv, timeout=10)
         suck = rospy.ServiceProxy(Suck_srv, Empty)
         suck(req)
-        rospy.sleep(0.5)
+        rospy.sleep(0.3)
 
 ###################################################3
     def srv_raisin(self, req_mani):

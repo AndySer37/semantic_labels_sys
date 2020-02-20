@@ -32,6 +32,7 @@ Goto_joint = "/ur5_control_server/ur_control/goto_joint_pose"
 Move_srv = "/arm_control/move_to"
 Home_srv = "/arm_control/home"
 Flip_srv = "/arm_control/flip"
+Toss_srv = "/arm_control/toss"
 Suck_srv = "/arm_control/suck_process"
 
 ## Data science 
@@ -77,7 +78,7 @@ class FSM():
         self.bn_detect_count = 0
         self.last_state = STOP
         self.state = STOP
-        self.test_without_arm = True
+        self.test_without_arm = False
         self.last_img = 0
         self.last_depth = 0
         self.last_mask = 0
@@ -212,6 +213,8 @@ class FSM():
                 self.last_count = len(upward_list) - 1
                 self.last_list = upward_list
             self.last_state = Perception_bn
+            ### Test obj
+            self.state = Perception_obj
             return 
 
         if self.state == Perception_obj:  
@@ -339,7 +342,7 @@ class FSM():
             self.mani_req.pose.position.z -= 0.06
             
             if self.last_state == Perception_obj:
-                self.mani_req.pose.position.z += 0.025
+                self.mani_req.pose.position.z += 0.01
                 self.state = pick_obj
             elif self.last_state == pose_bn:
                     self.state = pick_bn 
@@ -445,7 +448,7 @@ class FSM():
                 emp_resp = suck(emp)
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
-            self.mani_req.pose.position.z += 0.1
+            self.mani_req.pose.position.z += 0.12
             try:
                 rospy.wait_for_service(Move_srv, timeout=10)
                 mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -458,6 +461,7 @@ class FSM():
             return   
 
         if self.state == FLIP:  
+            print self.mani_req.pose.position.z
             emp = TriggerRequest()
             try:
                 rospy.wait_for_service(Flip_srv, timeout=10)

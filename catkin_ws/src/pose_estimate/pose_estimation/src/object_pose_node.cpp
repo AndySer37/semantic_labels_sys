@@ -269,7 +269,7 @@ object_pose_node::object_pose_node(){
 	ec.setMaxClusterSize (30000);
 	ec.setSearchMethod (tree);
 
-	lower_bound = 0.035;
+	lower_bound = 0.025;
 	upper_bound = 0.16;
 	z_range = 0.03;
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
