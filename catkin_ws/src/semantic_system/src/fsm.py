@@ -60,13 +60,14 @@ Place_raisin = 20
 Place_crayon = 21
 
 ### commodity_list
-### background crayons kleenex vanish milo raisins andes pocky lays hunts 3m
-OBJ_HEIGHT = [0.0, -0.038, -0.005, 0.0, 0.005, -0.03, -0.02, 0.045, 0.103, 0.01, 0.115]
-Y_DIS = 0.23
-OBJ_Depth = [0.0, 0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.0, -0.02, -0.02, -0.025]
+### background crayons kleenex vanish milo raisins andes pocky lays hunts 3m nutella dobie
+OBJ_HEIGHT = [0.0, -0.02, -0.005, 0.0, 0.005, -0.03, 0.01, 0.075, 0.103, 0.01, 0.1, -0.035, 0.02]
+Y_DIS = 0.25
+OBJ_Depth = [0.0, 0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.005, -0.02, -0.02, -0.025, -0.013, 0.0]
 
 ### Static Joint
 PrePare_Place = [5.506424903869629, -1.7503469626056116, 1.9935364723205566, -1.8246658484088343, -1.5188863913165491, 0.6822109818458557]
+Slope_OBJ = ["crayons", "pocky", "andes", "dobie"]
 
 class FSM():
     def __init__(self):
@@ -95,9 +96,15 @@ class FSM():
         self.x_90 = np.array([[1, 0, 0],[0, 0, -1],[0, 1, 0]],dtype = np.float32)
 
         self.shelf_pose = Pose()
-        self.shelf_pose.position.x = 0.139651686266; self.shelf_pose.position.y = -0.384602086405; self.shelf_pose.position.z = 0.424965406054
+        self.shelf_pose.position.x = 0.139651686266; self.shelf_pose.position.y = -0.384602086405
+        self.shelf_pose.position.z = 0.424965406054
         self.shelf_pose.orientation.x = 0.0038249214696; self.shelf_pose.orientation.y = -0.00640644391886
         self.shelf_pose.orientation.z = -0.68676603623; self.shelf_pose.orientation.w = 0.726840243061
+        self.shelf_pose_slope = Pose()
+        self.shelf_pose_slope.position.x = 0.139651686266; self.shelf_pose_slope.position.y = -0.380161604679
+        self.shelf_pose_slope.position.z = 0.407256296062
+        self.shelf_pose_slope.orientation.x = 0.0776534336896; self.shelf_pose_slope.orientation.y = 0.0639386324623
+        self.shelf_pose_slope.orientation.z = -0.683423125756; self.shelf_pose_slope.orientation.w = 0.723059213825
         self.shelf_count = 0
 
         self.place_shelf_test = rospy.Service("~test_arm_place_shelf", Trigger, self.test_arm)
@@ -214,7 +221,7 @@ class FSM():
                 self.last_list = upward_list
             self.last_state = Perception_bn
             ### Test obj
-            self.state = Perception_obj
+            # self.state = Perception_obj
             return 
 
         if self.state == Perception_obj:  
@@ -394,8 +401,10 @@ class FSM():
                 except rospy.ServiceException, e:
                     print "Service call failed: %s"%e
                 temp_mani_req = manipulationRequest()
-
-                temp_mani_req.pose = copy.deepcopy(self.shelf_pose)
+                if self.object in Slope_OBJ:
+                    temp_mani_req.pose = copy.deepcopy(self.shelf_pose_slope)
+                else:
+                    temp_mani_req.pose = copy.deepcopy(self.shelf_pose)
                 temp_mani_req.pose.position.x += (addr * 0.11)
                 temp_mani_req.pose.position.z += OBJ_HEIGHT[self.commodity_list.index(self.object)]
                 try:
@@ -462,11 +471,16 @@ class FSM():
 
         if self.state == FLIP:  
             print self.mani_req.pose.position.z
+            
             emp = TriggerRequest()
             try:
                 rospy.wait_for_service(Flip_srv, timeout=10)
-                flip_srv = rospy.ServiceProxy(Flip_srv, Trigger)
-                emp_resp = flip_srv(emp)
+                if self.mani_req.pose.position.z > 0.175:
+                    flip_srv = rospy.ServiceProxy(Flip_srv, Trigger)
+                    emp_resp = flip_srv(emp)
+                else:
+                    toss_srv = rospy.ServiceProxy(Toss_srv, Trigger)
+                    emp_resp = toss_srv(emp)                    
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
 
@@ -549,13 +563,13 @@ class FSM():
 
 
     def gripper_off(self):
-        rospy.sleep(1.5)
+        # rospy.sleep(1.5)
         rospy.wait_for_service('/gripper_control/close')
         try:
             gripper_close_ser = rospy.ServiceProxy('/gripper_control/close', Empty)
             req = EmptyRequest()
             resp1 = gripper_close_ser(req)
-            rospy.sleep(1.5)
+            rospy.sleep(0.5)
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e       
@@ -567,7 +581,7 @@ class FSM():
             gripper_close_ser = rospy.ServiceProxy('/gripper_control/open', Empty)
             req = EmptyRequest()
             resp1 = gripper_close_ser(req)
-            rospy.sleep(1.5)
+            rospy.sleep(0.5)
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e       
