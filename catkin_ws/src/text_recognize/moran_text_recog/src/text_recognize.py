@@ -265,6 +265,9 @@ class text_recognize(object):
 			elif self.commodity_list[i] == "vanish" and 0.3 < total[i] < 0.77:
 				_list = ["varish"]
 				_recheck = True
+			# elif self.commodity_list[i] == "crayola" and 0.3 < total[i] < 0.77:
+			# 	_list = ["casions"]
+			# 	_recheck = True
 			if _recheck == True:
 				
 				for _str in _list:
@@ -296,7 +299,7 @@ class text_recognize(object):
 				if 0.77 > total[i] > 0.68:
 					total[i] = 0.77
 				_recheck = False
-				
+
 				# print target, total[i], self.commodity_list[i]
 
 		return self.commodity_list[np.argmax(total)], np.max(total), np.max(total) >= 0.77   ## 0.66		

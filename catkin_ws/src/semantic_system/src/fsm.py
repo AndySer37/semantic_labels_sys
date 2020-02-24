@@ -60,14 +60,14 @@ Place_raisin = 20
 Place_crayon = 21
 
 ### commodity_list
-### background crayons kleenex vanish milo raisins andes pocky lays hunts 3m nutella dobie
-OBJ_HEIGHT = [0.0, -0.02, -0.005, 0.0, 0.005, -0.03, 0.01, 0.075, 0.103, 0.01, 0.1, -0.035, 0.02]
+### background crayola kleenex vanish milo raisins andes pocky lays hunts 3m nutella dobie
+OBJ_HEIGHT = [0.0, 0.025, -0.005, 0.0, 0.005, -0.03, 0.01, 0.075, 0.103, 0.01, 0.105, -0.035, 0.02]
 Y_DIS = 0.25
-OBJ_Depth = [0.0, 0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.005, -0.02, -0.02, -0.025, -0.013, 0.0]
+OBJ_Depth = [0.0, 0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.005, -0.02, -0.022, -0.015, -0.013, 0.0]
 
 ### Static Joint
 PrePare_Place = [5.506424903869629, -1.7503469626056116, 1.9935364723205566, -1.8246658484088343, -1.5188863913165491, 0.6822109818458557]
-Slope_OBJ = ["crayons", "pocky", "andes", "dobie"]
+Slope_OBJ = ["crayola", "pocky", "andes", "dobie"]
 
 class FSM():
     def __init__(self):
@@ -530,7 +530,7 @@ class FSM():
             msg = joint_value()
             for i in range(6):
                 msg.joint_value[i] = joint.position[i]
-            msg.joint_value[5] = 2.2
+            msg.joint_value[5] = 2.23
             req.joints.append(msg)
             req.factor = 0.5
             resp1 = ur5_joint_ser(req)
@@ -569,7 +569,7 @@ class FSM():
             gripper_close_ser = rospy.ServiceProxy('/gripper_control/close', Empty)
             req = EmptyRequest()
             resp1 = gripper_close_ser(req)
-            rospy.sleep(0.5)
+            rospy.sleep(0.8)
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e       

@@ -285,7 +285,7 @@ bn_pose_node::bn_pose_node(){
 
 	lower_bound = 0.022;
 	upper_bound = 0.16;
-	z_range = 0.008;
+	z_range = 0.015;
 	input.reset(new PointCloud<PointXYZRGB>()); 
 	output.reset(new PointCloud<PointXYZRGB>());
 	process.reset(new PointCloud<PointXYZRGB>());
