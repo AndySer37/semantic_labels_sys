@@ -52,6 +52,8 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond1 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
 	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, lower_bound)));
 	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, upper_bound)));
+	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::GT, -0.48)));
+	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::LT, 0)));
 	pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem1;
 	condrem1.setCondition(range_cond1);
 	condrem1.setInputCloud(process);
@@ -260,16 +262,16 @@ object_pose_node::object_pose_node(){
 	process.reset(new PointCloud<PointXYZRGB>());
 	tree.reset(new pcl::search::KdTree<pcl::PointXYZRGB>);
 
-	sor.setMeanK (10);
+	sor.setMeanK (50);
 	sor.setStddevMulThresh (0.8);
 	downsample.setLeafSize (0.002, 0.002, 0.002);
 
 	ec.setClusterTolerance (0.05); 
-	ec.setMinClusterSize (300);
+	ec.setMinClusterSize (400);
 	ec.setMaxClusterSize (30000);
 	ec.setSearchMethod (tree);
 
-	lower_bound = 0.028;
+	lower_bound = 0.025;
 	upper_bound = 0.16;
 	z_range = 0.03;
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);

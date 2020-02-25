@@ -283,9 +283,9 @@ bn_pose_node::bn_pose_node(){
 	target = "base_link";  // base_link
 	source = "camera_color_frame";
 
-	lower_bound = 0.022;
+	lower_bound = 0.015;
 	upper_bound = 0.16;
-	z_range = 0.015;
+	z_range = 0.01;
 	input.reset(new PointCloud<PointXYZRGB>()); 
 	output.reset(new PointCloud<PointXYZRGB>());
 	process.reset(new PointCloud<PointXYZRGB>());

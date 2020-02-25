@@ -63,7 +63,7 @@ Place_crayon = 21
 ### background crayola kleenex vanish milo raisins andes pocky lays hunts 3m nutella dobie
 OBJ_HEIGHT = [0.0, 0.025, -0.005, 0.0, 0.005, -0.03, 0.01, 0.075, 0.103, 0.01, 0.105, -0.035, 0.02]
 Y_DIS = 0.25
-OBJ_Depth = [0.0, 0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.005, -0.02, -0.022, -0.015, -0.013, 0.0]
+OBJ_Depth = [0.0, -0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.005, -0.02, -0.022, -0.02, -0.015, 0.0]
 
 ### Static Joint
 PrePare_Place = [5.506424903869629, -1.7503469626056116, 1.9935364723205566, -1.8246658484088343, -1.5188863913165491, 0.6822109818458557]
@@ -75,7 +75,7 @@ class FSM():
         self.commodity_list = []
         self.shelf_list = []
         self.read_commodity(r.get_path('text_msgs') + "/config/commodity_list.txt")
-        self.repeat_bn_detect = 5
+        self.repeat_bn_detect = 2
         self.bn_detect_count = 0
         self.last_state = STOP
         self.state = STOP
@@ -211,8 +211,9 @@ class FSM():
             upward_list = np.unique(self.cv_bridge.imgmsg_to_cv2(self.last_mask, "8UC1"))
             print "Brandname result: ", upward_list
             if len(upward_list) == 1 and self.bn_detect_count >= self.repeat_bn_detect:
-                self.state = HOME   ### Perception_obj
+                self.state = Perception_obj
                 self.last_count = 0
+                self.bn_detect_count = 0
                 self.last_list = []
             elif len(upward_list) > 1:
                 self.bn_detect_count = 0
@@ -475,7 +476,7 @@ class FSM():
             emp = TriggerRequest()
             try:
                 rospy.wait_for_service(Flip_srv, timeout=10)
-                if self.mani_req.pose.position.z > 0.175:
+                if self.mani_req.pose.position.z > 0.18:
                     flip_srv = rospy.ServiceProxy(Flip_srv, Trigger)
                     emp_resp = flip_srv(emp)
                 else:
