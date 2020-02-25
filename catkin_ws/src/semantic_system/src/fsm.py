@@ -61,9 +61,9 @@ Place_crayon = 21
 
 ### commodity_list
 ### background crayola kleenex vanish milo raisins andes pocky lays hunts 3m nutella dobie
-OBJ_HEIGHT = [0.0, 0.025, -0.005, 0.0, 0.005, -0.03, 0.01, 0.075, 0.103, 0.01, 0.105, -0.035, 0.02]
+OBJ_HEIGHT = [0.0, 0.025, -0.005, 0.0, 0.005, -0.03, 0.005, 0.075, 0.103, 0.01, 0.10, -0.035, 0.02]
 Y_DIS = 0.25
-OBJ_Depth = [0.0, -0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.005, -0.02, -0.022, -0.02, -0.015, 0.0]
+OBJ_Depth = [0.0, -0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.0, -0.02, -0.025, -0.02, -0.012, 0.0]
 
 ### Static Joint
 PrePare_Place = [5.506424903869629, -1.7503469626056116, 1.9935364723205566, -1.8246658484088343, -1.5188863913165491, 0.6822109818458557]
@@ -290,7 +290,8 @@ class FSM():
                     rpy = rot_to_rpy(q_mat)
                     # print "old =====" ,rpy
                     inv = -1 if np.abs(rpy[0]) > math.pi/2 else 1
-                    q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
+                    # q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
+                    q_new_mat = np.dot(q_mat, rpy_to_rot([0, 0, 0]))
                     if self.rot >= 2:
                         q_new_mat = np.dot(q_new_mat, rpy_to_rot([math.pi, 0, 0]))
                     # print "old222 =====" ,rot_to_rpy(q_new_mat)
