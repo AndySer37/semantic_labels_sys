@@ -477,7 +477,7 @@ class FSM():
             emp = TriggerRequest()
             try:
                 rospy.wait_for_service(Flip_srv, timeout=10)
-                if self.mani_req.pose.position.z > 0.18:
+                if self.mani_req.pose.position.z > 0.175:
                     flip_srv = rospy.ServiceProxy(Flip_srv, Trigger)
                     emp_resp = flip_srv(emp)
                 else:
