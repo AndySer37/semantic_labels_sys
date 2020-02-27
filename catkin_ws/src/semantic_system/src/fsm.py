@@ -290,8 +290,10 @@ class FSM():
                     rpy = rot_to_rpy(q_mat)
                     # print "old =====" ,rpy
                     inv = -1 if np.abs(rpy[0]) > math.pi/2 else 1
-                    # q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
-                    q_new_mat = np.dot(q_mat, rpy_to_rot([0, 0, 0]))
+                    if self.object == "3m" or self.object == "nutella" :
+                        q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
+                    else:
+                        q_new_mat = np.dot(q_mat, rpy_to_rot([0, 0, 0]))
                     if self.rot >= 2:
                         q_new_mat = np.dot(q_new_mat, rpy_to_rot([math.pi, 0, 0]))
                     # print "old222 =====" ,rot_to_rpy(q_new_mat)
@@ -351,7 +353,7 @@ class FSM():
             self.mani_req.pose.position.z -= 0.06
             
             if self.last_state == Perception_obj:
-                self.mani_req.pose.position.z += 0.01
+                self.mani_req.pose.position.z += 0.018
                 self.state = pick_obj
             elif self.last_state == pose_bn:
                     self.state = pick_bn 
@@ -477,7 +479,7 @@ class FSM():
             emp = TriggerRequest()
             try:
                 rospy.wait_for_service(Flip_srv, timeout=10)
-                if self.mani_req.pose.position.z > 0.175:
+                if self.mani_req.pose.position.z > 0.182:
                     flip_srv = rospy.ServiceProxy(Flip_srv, Trigger)
                     emp_resp = flip_srv(emp)
                 else:
