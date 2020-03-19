@@ -11,3 +11,4 @@
 *.jpg
 build/
 devel/
+.vscode/

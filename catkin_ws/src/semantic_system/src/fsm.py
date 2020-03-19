@@ -61,21 +61,21 @@ Place_crayon = 21
 
 ### commodity_list
 ### background crayola kleenex vanish milo raisins andes pocky lays hunts 3m nutella dobie
-OBJ_HEIGHT = [0.0, 0.035, -0.005, 0.0, 0.005, -0.03, 0.005, 0.075, 0.103, 0.01, 0.10, -0.035, 0.02]
+OBJ_HEIGHT = [0.0, 0.035, -0.005, 0.0, 0.005, -0.03, 0.005, 0.075, 0.103, 0.01, 0.11, -0.035, 0.02]
 Y_DIS = 0.25
-OBJ_Depth = [0.0, -0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.0, -0.02, -0.025, -0.02, -0.012, 0.0]
+OBJ_Depth = [0.0, -0.005, 0.0, -0.02, 0.0, 0.0, 0.005, 0.0, -0.02, -0.025, -0.02, -0.0135, 0.0]
 
 ### Static Joint
-PrePare_Place = [5.506424903869629, -1.7503469626056116, 1.9935364723205566, -1.8246658484088343, -1.5188863913165491, 0.6822109818458557]
+PrePare_Place = [5.558269500732422, -1.6930087248431605, 1.7912111282348633, -1.682331387196676, -1.519557301198141, 0.7341352701187134]
 Slope_OBJ = ["crayola", "pocky", "andes", "dobie"]
-
+High_obj = ["lays","3m","pocky"]
 class FSM():
     def __init__(self):
         r = rospkg.RosPack()
         self.commodity_list = []
-        self.shelf_list = []
+        self.shelf_list = ["","","","",""]
         self.read_commodity(r.get_path('text_msgs') + "/config/commodity_list.txt")
-        self.repeat_bn_detect = 3
+        self.repeat_bn_detect = 2
         self.bn_detect_count = 0
         self.last_state = STOP
         self.state = STOP
@@ -169,7 +169,7 @@ class FSM():
 
     def reset_shelf(self, req):
         self.shelf_count = 0
-        self.shelf_list = []
+        self.shelf_list = ["","","","",""]
         return TriggerResponse(success=True, message="Request accepted.")
 
     def process(self):
@@ -211,7 +211,7 @@ class FSM():
             upward_list = np.unique(self.cv_bridge.imgmsg_to_cv2(self.last_mask, "8UC1"))
             print "Brandname result: ", upward_list
             if len(upward_list) == 1 and self.bn_detect_count >= self.repeat_bn_detect:
-                self.state = HOME   ################### Perception_obj 
+                self.state = Perception_obj 
                 self.last_count = 0
                 self.bn_detect_count = 0
                 self.last_list = []
@@ -290,11 +290,10 @@ class FSM():
                     rpy = rot_to_rpy(q_mat)
                     # print "old =====" ,rpy
                     inv = -1 if np.abs(rpy[0]) > math.pi/2 else 1
-                    if self.object == "3m" or self.object == "nutella" or self.object == "crayola" or self.object == "pocky" or self.object == "kleenex"\
-                        :
-                        q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
-                    else:
+                    if self.object == "lays":
                         q_new_mat = np.dot(q_mat, rpy_to_rot([0, 0, 0]))
+                    else:
+                        q_new_mat = np.dot(q_mat, rpy_to_rot([0, inv*(math.pi/2 - rpy[1]), 0]))
                     if self.rot >= 2:
                         q_new_mat = np.dot(q_new_mat, rpy_to_rot([math.pi, 0, 0]))
                     # print "old222 =====" ,rot_to_rpy(q_new_mat)
@@ -354,7 +353,7 @@ class FSM():
             self.mani_req.pose.position.z -= 0.06
             
             if self.last_state == Perception_obj:
-                self.mani_req.pose.position.z += 0.018
+                self.mani_req.pose.position.z += 0.015
                 self.state = pick_obj
             elif self.last_state == pose_bn:
                     self.state = pick_bn 
@@ -390,8 +389,18 @@ class FSM():
                 if self.object in self.shelf_list:
                     addr = self.shelf_list.index(self.object)
                 else:
-                    addr = len(self.shelf_list)
-                    self.shelf_list.append(self.object)
+                    if self.object in High_obj:
+                        for i in range(0,5):
+                            if self.shelf_list[i] == "":
+                                self.shelf_list[i] = self.object
+                                addr = i
+                                break
+                    else:
+                        for i in range(0,5):
+                            if self.shelf_list[4-i] == "":
+                                self.shelf_list[4-i] = self.object
+                                addr = 4-i
+                                break
 
                 rospy.wait_for_service(Goto_joint)
                 try:
@@ -462,7 +471,7 @@ class FSM():
                 emp_resp = suck(emp)
             except (rospy.ServiceException, rospy.ROSException), e:
                 print "Service call failed: %s"%e 
-            self.mani_req.pose.position.z += 0.12
+            self.mani_req.pose.position.z += 0.11
             try:
                 rospy.wait_for_service(Move_srv, timeout=10)
                 mani_move_srv = rospy.ServiceProxy(Move_srv, manipulation)
@@ -479,7 +488,7 @@ class FSM():
             emp = TriggerRequest()
             try:
                 rospy.wait_for_service(Flip_srv, timeout=10)
-                if self.mani_req.pose.position.z > 0.182:
+                if self.mani_req.pose.position.z > 0.189:
                     flip_srv = rospy.ServiceProxy(Flip_srv, Trigger)
                     emp_resp = flip_srv(emp)
                 else:

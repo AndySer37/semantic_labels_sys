@@ -11,7 +11,7 @@ void object_pose_node::getXYZ(float* a, float* b,float zc){
 
 bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs::object_only::Response &res){
 	res.count = 0;
-
+	float max_y = -999;
 	sensor_msgs::PointCloud2::ConstPtr ros_pc = ros::topic::waitForMessage<sensor_msgs::PointCloud2>("/camera/depth_registered/points",ros::Duration());
 	pcl::fromROSMsg(*ros_pc, *input);
 	static tf::TransformBroadcaster br;
@@ -52,7 +52,7 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 	pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond1 (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
 	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, lower_bound)));
 	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, upper_bound)));
-	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::GT, -0.45)));
+	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::GT, -0.49)));
 	range_cond1->addComparison(pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::LT, 0)));
 	pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem1;
 	condrem1.setCondition(range_cond1);
@@ -157,7 +157,7 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		p8.y = h(1);
 		p8.z = h(2);
 
-
+		
 
 		marker.points.push_back(p1);
 		marker.points.push_back(p2);
@@ -222,7 +222,15 @@ bool object_pose_node::serviceCb(text_msgs::object_only::Request &req, text_msgs
 		ob_pose.pose.position.x = pose_trans.getX();
 		ob_pose.pose.position.y = pose_trans.getY();
 		ob_pose.pose.position.z = pose_trans.getZ();
-		res.ob_list.push_back(ob_pose);
+		// cout << count << " : " << position_OBB.y << endl;
+		if (max_y < position_OBB.y){
+			max_y = position_OBB.y;
+			res.ob_list.insert(res.ob_list.begin(), ob_pose);
+		}
+		else{
+			res.ob_list.push_back(ob_pose);
+		}
+		
 
 		res.count += 1;
 		/////////////////////////////////////
@@ -266,14 +274,14 @@ object_pose_node::object_pose_node(){
 	sor.setStddevMulThresh (0.8);
 	downsample.setLeafSize (0.002, 0.002, 0.002);
 
-	ec.setClusterTolerance (0.005); 
-	ec.setMinClusterSize (400);
+	ec.setClusterTolerance (0.002); 
+	ec.setMinClusterSize (550);
 	ec.setMaxClusterSize (30000);
 	ec.setSearchMethod (tree);
 
-	lower_bound = 0.024;
+	lower_bound = 0.027;
 	upper_bound = 0.16;
-	z_range = 0.03;
+	z_range = 0.02;
 	pub_pc_process = nh.advertise<sensor_msgs::PointCloud2> ("process_pc", 10);
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2> ("pc", 10);
 
